@@ -1,0 +1,9 @@
+.west/
+zephyr/
+bootloader/
+build*/
+modules/
+tools/
+.vscode/
+*.bin
+*.zip
