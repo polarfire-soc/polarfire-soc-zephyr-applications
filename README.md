@@ -59,7 +59,7 @@ $ cd zephyr
 $ west init -l
 $ cd ../
 $ west update
-$ source zephyr-env.sh
+$ source zephyr/zephyr-env.sh
 ```
 
 ### Build an application and generate eclipse project configuration files
