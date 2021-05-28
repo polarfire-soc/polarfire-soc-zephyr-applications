@@ -1,0 +1,78 @@
+# Copyright (c) 2020 Linaro Limited.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Documentation GitHub Workflow
+
+on:
+  pull_request:
+    paths:
+    - 'Makefile'
+    - 'doc/**'
+    - '**.rst'
+    - 'include/**'
+    - 'kernel/include/kernel_arch_interface.h'
+    - 'lib/libc/**'
+    - 'subsys/testsuite/ztest/include/**'
+    - 'tests/**'
+    - '.known-issues/doc/**'
+    - '**/Kconfig*'
+    - 'west.yml'
+    - '.github/workflows/doc-build.yml'
+
+jobs:
+  doc-build:
+    name: "Documentation Build"
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Update PATH for west
+      run: |
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: checkout
+      uses: actions/checkout@v2
+
+    - name: install-pkgs
+      run: |
+        sudo apt-get install -y ninja-build doxygen
+
+    - name: cache-pip
+      uses: actions/cache@v1
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-doc-pip
+
+    - name: install-pip
+      run: |
+        pip3 install setuptools wheel
+        pip3 install -r scripts/requirements-base.txt
+        pip3 install -r scripts/requirements-doc.txt
+
+    - name: west setup
+      run: |
+        west init -l . || true
+
+    - name: build-docs
+      run: |
+        source zephyr-env.sh
+        make htmldocs
+        tar cvf htmldocs.tar --directory=./doc/_build html
+
+    - name: upload-build
+      uses: actions/upload-artifact@master
+      continue-on-error: True
+      with:
+        name: htmldocs.tar
+        path: htmldocs.tar
+
+    - name: check-warns
+      run: |
+        if [ -s doc/_build/doc.warnings ]; then
+           docwarn=$(cat doc/_build/doc.warnings)
+           docwarn="${docwarn//'%'/'%25'}"
+           docwarn="${docwarn//$'\n'/'%0A'}"
+           docwarn="${docwarn//$'\r'/'%0D'}"
+           # We treat doc warnings as errors
+           echo "::error file=doc.warnings::$docwarn"
+           exit 1
+        fi

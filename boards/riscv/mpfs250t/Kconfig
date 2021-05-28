@@ -1,0 +1,18 @@
+# Icicle board configuration
+
+# Copyright (c) 2020 Tobias Svehagen
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_USE_DDR
+	bool "Enable running in DDR instead of LIM"
+	select SOC_ICICLE_IN_DDR
+	default n
+	depends on BOARD_MPFS250T
+	
+config BOARD_HART_TO_USE
+	int "Select single Hart to run Zephyr on"
+	range 0 4
+	default 1
+	depends on BOARD_MPFS250T
+	
+	

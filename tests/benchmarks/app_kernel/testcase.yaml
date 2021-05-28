@@ -1,0 +1,11 @@
+tests:
+  benchmark.kernel.application:
+    arch_allow: x86 arm riscv32 riscv64
+    min_flash: 34
+    min_ram: 32
+    tags: benchmark
+    timeout: 300
+  benchmark.kernel.application.posix:
+    arch_allow: posix
+    min_ram: 32
+    tags: benchmark

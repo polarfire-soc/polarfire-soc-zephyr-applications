@@ -1,0 +1,73 @@
+/*
+ * Copyright (c) 2020 Nuvoton Technology Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <nuvoton/npcx7m6fb.dtsi>
+
+/ {
+	model = "Nuvoton NPCX7M6FB evaluation board";
+
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,console = &uart1;
+		zephyr,flash = &flash0;
+	};
+
+	aliases {
+		/* For samples/basic/blinky_pwm */
+		pwm-led0 = &pwm_led0_green;
+		/* For pwm test suites */
+		pwm-0 = &pwm6;
+		/* For i2c test suites */
+		i2c-0 = &i2c0_0;
+	};
+
+	pwmleds {
+		compatible = "pwm-leds";
+		pwm_led0_green: pwm_led_0 {
+			pwms = <&pwm6 0 PWM_POLARITY_INVERTED>;
+			label = "User D7 green";
+		};
+	};
+
+	def_lvol_io_list {
+		compatible = "nuvoton,npcx-lvolctrl-def";
+		/*
+		 * Put low-voltage io pads into "lvol_io_pads" property if the
+		 * detection level of them is 1.8V, For example, if the bus
+		 * voltage of i2c1_0 port is 1.8V, this property should be:
+		 * lvol_io_pads = <&lvol_io90 &lvol_io87>;
+		 */
+		lvol_io_pads = <>;
+	};
+
+};
+
+/* Overwirte default device properties with overlays in board dt file here. */
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&altc_uart1_sl2>; /* Use UART1_SL2 ie. PIN64.65 */
+};
+
+&pwm6 {
+	status = "okay";
+};
+
+&adc0 {
+	/* ADC pinmux is changed only if related channel is configured. */
+	status = "okay";
+};
+
+&espi0 {
+	status = "okay";
+};
+
+&i2c0_0 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+};

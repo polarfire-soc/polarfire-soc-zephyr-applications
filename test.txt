@@ -1,0 +1,921 @@
+    1* 
+    2  ls
+    3  mkdir Project
+    4* 
+    5  mkdir Bitbucket
+    6  cd Bitbucket/
+    7  mkdir Buildroot
+    8  cd Buildroot/
+    9  pwd
+   10* 
+   11  chmod 777 vpnsetup.sh
+   12  ./vpnsetup.sh 
+   13  sudo ./vpnsetup.sh 
+   14  sudo apt-get install lib32z1 lib32ncurses5
+   15  sudo apt-get install lib32z1 lib32ncurses6
+   16  sudo apt install libpangox-1.0-0 libcanberra-gtk-module
+   17  /opt/cisco/anyconnect
+   18  sudo apt install libgtk2.0-0
+   19  /opt/cisco/anyconnect/bin/vpnui
+   20  sudo apt-get install network-manager-openconnect-gnome
+   21  sudo apt-­get install network-manager-pptp network-manager-vpnc network-manager-openvpn
+   22  sudo apt-get install network-manager-pptp network-manager-vpnc network-manager-openvpn
+   23  sudo apt install libpangox-1.0-0 libcanberra-gtk-module
+   24  sudo apt-get install libpangox-1.0-0
+   25  sudo apt-get install ../libpangox-1.0-0_0.0.2-5ubuntu1_i386.deb  ../libpangox-1.0-dev_0.0.2-5ubuntu1_i386.deb
+   26  sudo apt-get update
+   27  sudo apt-get install libpangox-1.0-0
+   28  sudo apt install libpangox-1.0-0 libcanberra-gtk-module
+   29  ls -l
+   30  ls -l 
+   31  cd Project/
+   32  cd Bitbucket/Buildroot/
+   33  mkdir develop-can_usb_icicle
+   34  cd develop-can_usb_icicle/
+   35  git clone https://bitbucket.microchip.com/scm/fpga_pfsoc_es/polarfire-soc-buildroot-sdk.git
+   36  sudo apt install git
+   37  git clone https://bitbucket.microchip.com/scm/fpga_pfsoc_es/polarfire-soc-buildroot-sdk.git
+   38  cd polarfire-soc-buildroot-sdk
+   39  git checkout develop-can_musb_icicle 
+   40  git submodule sync
+   41  git submodule update --init --recursive
+   42* 
+   43  make all DEVKIT=icicle-kit-es
+   44  make clean
+   45  make all DEVKIT=icicle-kit-es
+   46  sudo apt-get install lib32z1
+   47  sudo apt-get install lib32ncurses6
+   48  sudo apt install make 
+   49  sudo apt install make-guile 
+   50  make clean
+   51  pwd
+   52  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/
+   53  make clean
+   54  make all DEVKIT=icicle-kit-es
+   55  sudo apt install autoconf automake autotools-dev bc bison build-essential curl flex gawk gdisk git gperf libgmp-dev libmpc-dev libmpfr-dev libncurses-dev libssl-dev libtool patchutils python screen texinfo unzip zlib1g-dev libblkid-dev device-tree-compiler libglib2.0-dev libpixman-1-dev mtools  linux-firmware rsync python3 libexpat1-dev wget cpio xxd dosfstools python3-pip libyaml-dev libelf-dev zlib1g-dev
+   56  sudo minicom -s
+   57  sudo minicom -s
+   58  sudo apt-get install minicom
+   59  sudo minicom -s
+   60  pwd
+   61  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/
+   62  make all DEVKIT=icicle-kit-es
+   63  make clean
+   64  make all DEVKIT=icicle-kit-es
+   65  touch hart-software-services/
+   66  make all DEVKIT=icicle-kit-es
+   67* 
+   68  make all DEVKIT=icicle-kit-es
+   69  sudo pip3 install kconfiglib
+   70  make all DEVKIT=icicle-kit-es
+   71  sudo umount /dev/sdb*
+   72  ls /dev/sdb*
+   73  sudo umount /dev/sdb*
+   74  sudo make DISK=/dev/sdb DEVKIT-icicle-kit-es format-icicle-image
+   75  sudo make DISK=/dev/sdb DEVKIT=icicle-kit-es format-icicle-image
+   76  sudo umount /dev/sdb*
+   77  sudo make DISK=/dev/sdb DEVKIT=icicle-kit-es format-icicle-image
+   78  sudo umount /dev/sdb*
+   79  sudo make DISK=/dev/sdb DEVKIT=icicle-kit-es format-icicle-image
+   80  pwd
+   81  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/
+   82  pwd
+   83  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/
+   84  umount /dev/sdb*
+   85  sudo make DISK=/dev/sdb DEVKIT=icicle-kit-es format-icicle-image
+   86  umount /dev/sdb*
+   87  sudo make DISK=/dev/sdb DEVKIT=icicle-kit-es format-icicle-image
+   88  umount /dev/sdb*
+   89  sudo umount /dev/sdb*
+   90  sudo make DISK=/dev/sdb DEVKIT=icicle-kit-es format-icicle-image
+   91  sudo umount /dev/sdb*
+   92  sudo make DISK=/dev/sdb DEVKIT=icicle-kit-es format-icicle-image
+   93  fdisk -l
+   94  sudo fdisk -l
+   95  sudo minicom -s
+   96  sudo minicom -s
+   97  wget https://www.scootersoftware.com/bcompare-4.3.7.25118_amd64.deb
+   98  sudo apt-get update
+   99  sudo apt-get install gdebi-core
+  100  sudo gdebi bcompare-4.3.7.25118_amd64.deb
+  101  wget https://www.scootersoftware.com/bcompare-4.3.7.25118_amd64.deb
+  102  sudo apt-get update
+  103  sudo apt-get install gdebi-core
+  104  sudo gdebi bcompare-4.3.7.25118_amd64.deb
+  105  ls
+  106  chmod 777 bcompare-4.3.7.25118_amd64.deb
+  107  sudo gdebi bcompare-4.3.7.25118_amd64.deb
+  108  ls -l
+  109  sudo gdebi bcompare-4.3.7.25118_amd64.deb
+  110  ls -l
+  111  sudo gdebi bcompare-4.3.7.25118_amd64.deb.1
+  112  fdisk -l
+  113  sudo fdisk -l
+  114  sudo fdisk -l
+  115  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/
+  116  sudo umount /dev/sdc*
+  117  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  118  make all DEVKIT=icicle-kit-es
+  119  touch patches/linux/
+  120  make all DEVKIT=icicle-kit-es
+  121  sudo umount /dev/sdc*
+  122  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  123  make all DEVKIT=icicle-kit-es
+  124  sudo umount /dev/sdc*
+  125  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  126  cd Project/Bitbucket/
+  127  ls
+  128  cd Yocto
+  129  mkdir Yocto
+  130  cd Yocto/
+  131  mkdir yocto-dev && cd yocto-dev
+  132  repo init -u https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git -b develop_usb_can -m tools/manifests/bb_testb.xml
+  133  gedit /etc/fstab
+  134  sudo gedit /etc/fstab
+  135  repo init -u https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git -b develop_usb_can -m tools/manifests/bb_testb.xml
+  136  ls -ld /dev/shm
+  137  sudo chmod 777 /dev/shm
+  138  repo init -u https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git -b develop_usb_can -m tools/manifests/bb_testb.xml
+  139  cd /
+  140  sudo chmod 777 /dev/shm
+  141  pwd
+  142  cd /home/vidip/Project/Bitbucket/Yocto/yocto-dev/
+  143  repo init -u https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git -b develop_usb_can -m tools/manifests/bb_testb.xml
+  144  cd /
+  145  chmod go+w /dev/shm
+  146  sudo chmod go+w /dev/shm
+  147  repo init -u https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git -b develop_usb_can -m tools/manifests/bb_testb.xml
+  148  cd /home/vidip/Project/Bitbucket/Yocto/
+  149  repo init -u https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git -b develop_usb_can -m tools/manifests/bb_testb.xml
+  150  cd /
+  151  chmod +x /etc/rc.local): /usr/bin/chmod go+w /dev/shm
+  152  chmod +x /etc/rc.local
+  153  nano /etc/fstab
+  154  mount /dev/shm
+  155  sudo mount /dev/shm
+  156  cd Project/Bitbucket/Yocto/
+  157  repo init -u https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git -b develop_usb_can -m tools/manifests/bb_testb.xml
+  158  mkdir yocto-dev && cd yocto-dev
+  159  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  160  sudo chmod 777 /dev/shm
+  161  mkdir yocto-dev && cd yocto-dev
+  162  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  163  cd /
+  164  sudo chmod 777 /dev/shm
+  165  cd /home/vidip/Project/Bitbucket/Yocto/
+  166  mkdir yocto-dev && cd yocto-dev
+  167  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  168  ls /dev/s*
+  169  cat /dev/shm
+  170  pwd
+  171  cd /
+  172  rm /dev/shm
+  173  rmdir /dev/shm
+  174  sudo rmdir /dev/shm
+  175  sudo snap install git-repo
+  176  sudo minicom -s
+  177  sudo minicom -s
+  178  pwd
+  179  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk
+  180  make linux-menuconfig 
+  181  make all DEVKIT=icicle-kit-es
+  182  fdisk -l
+  183  Sudo fdisk -l
+  184  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  185  touch conf/
+  186  make all DEVKIT=icicle-kit-es
+  187  make linux-menuconfig 
+  188  make all DEVKIT=icicle-kit-es
+  189  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  190  touch linux/
+  191  make all DEVKIT=icicle-kit-es
+  192  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  193  touch hart-software-services/
+  194  touch u-boot/
+  195  touch riscv-isa-sim/
+  196  make all DEVKIT=icicle-kit-es
+  197  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  198  touch linux/
+  199  touch u-boot/
+  200  touch hart-software-services/
+  201  touch riscv-isa-sim/
+  202  make all DEVKIT=icicle-kit-es
+  203  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  204  touch conf/
+  205  make all DEVKIT=icicle-kit-es
+  206  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  207  make linux-menuconfig 
+  208  make buildroot_initramfs-menuconfig 
+  209  make buildroot_initramfs_sysroot 
+  210  make linux-menuconfig 
+  211  make buildroot_initramfs-menuconfig 
+  212  make initrd 
+  213  make linux-menuconfig 
+  214  make menuconfig
+  215  ls
+  216  cd buildroot/
+  217  make menuconfig 
+  218  make all DEVKIT=icicle-kit-es
+  219  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  220  touch linux/
+  221  make all DEVKIT=icicle-kit-es
+  222  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  223  sudo rmdir /dev/shm
+  224  ls -l /dev/sd*
+  225  ls -l /dev/sh*
+  226  ls -l /dev/shm
+  227  mkdir /dev/shm
+  228  chmod 777 /dev/shm
+  229  sudo chmod 777 /dev/shm
+  230  sudo gedit /etc/fstab
+  231  cd Project/Bitbucket/Yocto/
+  232  mkdir yocto-dev && cd yocto-dev
+  233  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  234  sudo repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  235  sudo gedit /etc/fstab
+  236  sudo repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  237  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  238  ls -ld run/shm
+  239  cd /
+  240  ls -ld run/shm
+  241  mount
+  242  sudo gedit /etc/fstab
+  243  ls
+  244  pwd
+  245  cd Project/
+  246  ls
+  247  cd Bitbucket/
+  248  ls
+  249  Yocto/
+  250  cd Yocto/
+  251  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  252  pip install -r requirements.txt
+  253  cd /
+  254  sudo chown -R $USER /usr/local/lib/python2.7/
+  255  cd /home/vidip/Project/Bitbucket/Yocto/
+  256  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  257  cd /
+  258  sudo chown -R $USER /usr/local/lib/python3.8/
+  259  cd /home/vidip/Project/Bitbucket/Yocto/
+  260  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  261  repo
+  262  cd /
+  263  repo
+  264  cd 
+  265  cd /
+  266  sudo apt-get install repo
+  267  sudo apt install python3-distutils
+  268  sudo apt install libyaml-dev
+  269  sudo apt install libelf-dev
+  270  sudo apt install
+  271  sudo apt install repo
+  272  lsb_)release -a
+  273  lsb_release -a
+  274  repo init
+  275  sudo apt install repo
+  276  sudo apt install repo init
+  277  cat /etc/apt/sources.list
+  278  software-properties-gtk
+  279  cd Project/Bitbucket/Yocto/
+  280  ls
+  281  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  282  repo
+  283  repo?
+  284  snap info repo
+  285  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  286  cat /proc/sys/fs/inotify/max_user_watches
+  287  echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+  288  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  289  sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib      build-essential chrpath socat cpio python python3 python3-pip python3-pexpect \
+  290  sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib      build-essential chrpath socat cpio python python3 python3-pip python3-pexpect      xz-utils debianutils iputils-ping libsdl1.2-dev xterm
+  291  apt-cache search repo
+  292  sudo apt-get install repo
+  293  cd Project/Bitbucket/Yocto/
+  294  mkdir yocto-dev && cd yocto-dev
+  295  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  296  sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib      build-essential chrpath socat cpio python python3 python3-pip python3-pexpect      xz-utils debianutils iputils-ping
+  297  mkdir -p ~/.bin
+  298  pwd
+  299  PATH="${HOME}/.bin:${PATH}"
+  300  curl https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
+  301  chmod a+rx ~/.bin/repo
+  302  sudo apt-get install repo
+  303  sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib      build-essential chrpath socat cpio python python3 python3-pip python3-pexpect      xz-utils debianutils iputils-ping
+  304  sudo apt-get install make xsltproc docbook-utils fop dblatex xmlto
+  305  sudo dnf install gawk make wget tar bzip2 gzip python3 unzip perl patch      diffutils diffstat git cpp gcc gcc-c++ glibc-devel texinfo chrpath      ccache perl-Data-Dumper perl-Text-ParseWords perl-Thread-Queue perl-bignum socat      python3-pexpect findutils which file cpio python python3-pip xz
+  306  sudo apt-get install dnf
+  307  udo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib      build-essential chrpath socat cpio python python3 python3-pip python3-pexpect      xz-utils debianutils iputils-ping
+  308  sudo apt install udo
+  309  sudo apt-get install libsdl1.2-dev xterm
+  310  sudo apt-get install make xsltproc docbook-utils fop dblatex xmlto
+  311  sudo apt-get install python-git
+  312  sudo apt-get install python-git-doc
+  313  sh poky-glibc-x86_64-buildtools-tarball-x86_64-buildtools-nativesdk-standalone-2.4.1.sh
+  314  udo apt-get build-dep qemu
+  315  sudo apt-get build-dep qemu
+  316  sudo apt-get remove oss4-dev
+  317  cd Project/Bitbucket/Yocto
+  318  mkdir yocto-dev && cd yocto-dev
+  319  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  320  cd ..
+  321  sudo apt install python3-distutils
+  322  sudo apt-get install libyaml-dev
+  323  sudo apt-get install libelf-dev
+  324  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  325  sudo dnf install python3-GitPython
+  326  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  327  gedit /etc/ftab
+  328  gedit /etc/fstab
+  329  mkdir yocto-dev && cd yocto-dev
+  330  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  331  touch *.*
+  332  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  333  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git
+  334  git clone https://bitbucket.microchip.com/scm/fpga_pfsoc_es/meta-polarfire-soc-yocto-bsp.git
+  335  ls
+  336  cd meta-polarfire-soc-yocto-bsp/
+  337  repo sync
+  338  repo init
+  339  repo rebase
+  340  ./polarfire-soc_yocto_setup.sh 
+  341  cd yocto-dev/
+  342  repo init -u https://github.com/polarfire-soc/meta-polarfire-soc-yocto-bsp.git -b master -m tools/manifests/riscv-yocto.xml
+  343  repo?
+  344  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/
+  345  cd polarfire-soc-buildroot-sdk_wk_11012021copy/
+  346  make all DEVKIT=icicle-kit-es
+  347  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  348  make all DEVKIT=icicle-kit-es
+  349  touch work/linux_build/drivers/usb
+  350  make all DEVKIT=icicle-kit-es
+  351  touch work/linux_build/drivers/usb
+  352  make all DEVKIT=icicle-kit-es
+  353  touch work/linux_build/drivers/usb
+  354  make all DEVKIT=icicle-kit-es
+  355  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  356  make all DEVKIT=icicle-kit-es
+  357  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  358  make all DEVKIT=icicle-kit-es
+  359  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  360  make all DEVKIT=icicle-kit-es
+  361  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  362  make all DEVKIT=icicle-kit-es
+  363  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  364  make all DEVKIT=icicle-kit-es
+  365  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  366  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk
+  367  cd buildroot/
+  368  make menuconfig 
+  369  cd ..
+  370  make linux-menuconfig 
+  371  make all DEVKIT=icicle-kit-es
+  372  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  373  make clean
+  374  make all DEVKIT=icicle-kit-es
+  375  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  376  cd buildroot/
+  377  make menuconfig
+  378  cd ..
+  379  make all DEVKIT=icicle-kit-es
+  380  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  381  make all DEVKIT=icicle-kit-es
+  382  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  383  make all DEVKIT=icicle-kit-es
+  384  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  385  cd Project/Bitbucket/Yocto/yocto-dev/
+  386  repo sync
+  387  repo rebase
+  388  . ./meta-polarfire-soc-yocto-bsp/polarfire-soc_yocto_setup.sh
+  389  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  390  repo sync
+  391  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  392  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk_wk_13012021/
+  393  make all DEVKIT=icicle-kit-es
+  394  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  395  make linux-menuconfig 
+  396  cd buildroot/
+  397  make menuconfig 
+  398  cd ..
+  399  make all DEVKIT=icicle-kit-es
+  400  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  401  make all DEVKIT=icicle-kit-es
+  402  sudo minicom -s
+  403  sudo minicom -s
+  404  sudo apt-get install v4l-utils
+  405  v4l2-ctl 
+  406  v4l2-ctl --list-formats-ext
+  407  lsusb
+  408  v4l2-ctl --list-formats-ext
+  409  v4l2-ctl --help
+  410  v4l2-ctl --list-formats-ext
+  411  v4l2-ctl --set-fmt-video=width=640,height=480,pixelformat=1
+  412  v4l2-ctl --set-fmt-video=width=640,height=480,
+  413  v4l2-ctl --set-parm=15
+  414  ffmpeg -f video4linux2 -s 640x480 -r 15 -i /dev/video0 test.mp4
+  415  sudo snap install ffmpeg
+  416  ffmpeg -f video4linux2 -s 640x480 -r 15 -i /dev/video0 test.mp4
+  417  sudo ffmpeg -f video4linux2 -s 640x480 -r 15 -i /dev/video0 test.mp4
+  418  sudo ffmpeg -f video4linux2 -s 320x240 -r 15 -i /dev/video0 test.mp4
+  419  ```````````````````````````````````````````````````````````````````````````````[A
+  420  sudo ffmpeg -f video4linux2 -s 320x240 -r 15 -i /dev/video0 test.mp4
+  421  v4l2-ctl --set-fmt-video=width=800,height=600,pixelformat=1
+  422  v4l2-ctl --set-fmt-video=width=480,height=640,pixelformat=1
+  423  lsusb
+  424  v4l2-ctl --set-fmt-video=width=800,height=600,pixelformat=1
+  425  v4l2-ctl --set-fmt-video=width=480,height=640,pixelformat=1
+  426  v4l2-ctl --set-fmt-video=width=480,height=640,pixelformat=2
+  427  v4l2-ctl --set-fmt-video=width=480,height=640
+  428  v4l2-ctl --set-parm=15
+  429  ffmpeg -f video4linux2 -s 640x480 -r 15 -i /dev/video0 test.mp4
+  430  ls /dev/video*
+  431  ls /dev/video0
+  432  v4l2-compliance
+  433  2
+  434  v4l2-ctl --list-ctrls
+  435  ffmpeg -f video4linux2 -i /dev/video0 out.avi
+  436  sudo ffmpeg -f video4linux2 -i /dev/video0 out.avi
+  437  yavta -fUYVY /dev/video1 -c30 -n4 -s640x480 -Ftest.yuv
+  438  sudo apt install yavta
+  439  yavta -fUYVY /dev/video1 -c30 -n4 -s640x480 -Ftest.yuv
+  440  yavta -f YUYV -s 640x480 -n 1 --capture=1 -F /dev/video0
+  441  export PATH=$PATH:/home/vidip/Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/toolchain/bin
+  442  make
+  443  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk
+  444  cd buildroot/
+  445  make menuconfig
+  446  cd ..
+  447  make linux-menuconfig 
+  448  make all DEVKIT=icicle-kit-es
+  449  make linux-menuconfig 
+  450  make all DEVKIT=icicle-kit-es
+  451  pwd
+  452  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk
+  453  pwd
+  454  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  455  make all DEVKIT=icicle-kit-es
+  456  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  457  make all DEVKIT=icicle-kit-es
+  458  touch buildroot/
+  459  make all DEVKIT=icicle-kit-es
+  460  rm work/buildroot_initramfs
+  461  rm -r work/buildroot_initramfs
+  462  rm -rf work/buildroot_initramfs
+  463  make all DEVKIT=icicle-kit-es
+  464  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/work/
+  465  rm -d buildroot_initramfs
+  466  rm -d buildroot_initramfs
+  467  rm -d buildroot_initramfs_sysroot/
+  468  sudo rm -r buildroot_initramfs_sysroot/
+  469  sudo rm -r buildroot_initramfs
+  470  sudo rm -r buildroot_initramfs_sysroot/
+  471  sudo rm -r buildroot_build/
+  472  sudo minicom -s
+  473  sudo minicom -s
+  474  cd 
+  475  make all DEVKIT=icicle-kit-es
+  476  touch buildroot/
+  477  make all DEVKIT=icicle-kit-es
+  478  pwd
+  479  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk_wk_11012021
+  480  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  481  make all DEVKIT=icicle-kit-es
+  482  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  483  cd ..
+  484  cd polarfire-soc-buildroot-sdk_wk_11012021copy
+  485  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  486  make all DEVKIT=icicle-kit-es
+  487  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  488  sudo fdisk -l
+  489  mount /dev/sdc2 /mnt
+  490  cd /
+  491  mount /dev/sdc2 /mnt
+  492  cd /root/
+  493  cd /root
+  494  sudo cd /root
+  495  pwd
+  496  cd /root
+  497  ls
+  498  mount /dev/sdc2 /mnt
+  499  sudo mount /dev/sdc2 /mnt
+  500  ls /mnt
+  501  umount /mnt
+  502  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk_wk_11012021
+  503  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  504  ls /dev/sdc*
+  505  ls /dev/sdc
+  506  ls /dev/sdc1 
+  507  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  508  make all DEVKIT=icicle-kit-es
+  509  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  510  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk/toolchain/bin/
+  511  ls
+  512  export PATH=$PATH:$(pwd)
+  513  cd ..
+  514  cd git/
+  515  ls
+  516  make
+  517  make clean
+  518  make
+  519  cp yavta /dev/sdc2
+  520  sudo cp yavta /dev/sdc2
+  521  sudo minicom -s
+  522  sudo minicom -s
+  523  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk_wk_11012021
+  524  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  525  cd ..
+  526  cd polarfire-soc-buildroot-sdk_wk_11012021copy
+  527  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  528  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk
+  529  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  530  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk_wk_11012021
+  531  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  532  cd ..
+  533  cd polarfire-soc-buildroot-sdk_wk_11012021copy
+  534  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  535  cd ..
+  536  cd polarfire-soc-buildroot-sdk_wk_11012021
+  537  cd buildroot/
+  538  make menuconfig 
+  539  cd ..
+  540  cd buildroot/
+  541  make menuconfig 
+  542  cd ..
+  543  cd Yocto/yocto-dev/
+  544  repo sync
+  545  repo rebase
+  546  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  547  repo sync
+  548  cp /home/vidip/Project/Bitbucket/Yocto/yocto-dev/.repo/repo/repo /home/vidip/bin/repo
+  549  repo sync
+  550  repo rebase
+  551  . ./meta-polarfire-soc-yocto-bsp/polarfire-soc_yocto_setup.sh
+  552  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  553  cd ..
+  554  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  555  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk_wk_11012021copy
+  556  make linux-menuconfig
+  557  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/git/
+  558  sudo cp *.* /dev/sdc2
+  559  dd if=*.* of=/dev/sdc2
+  560  dd if=yavta of=/dev/sdc2
+  561  sudo dd if=yavta of=/dev/sdc2
+  562  fdisk -l
+  563  sudo fdisk -l
+  564  sudo dd if=yavta of=/dev/sdc3
+  565  ls
+  566  sudo dd if=yavta.o of=/dev/sdc3
+  567  sudo dd if=yavta of=/dev/sdc3
+  568  sudo dd if=yavta.c of=/dev/sdc3
+  569  make clean
+  570  make
+  571  make clean
+  572  make
+  573  cd ..
+  574  cd polarfire-soc-buildroot-sdk_wk_11012021/toolchain/bin/
+  575  export PATH=$PATH:$(pwd)
+  576  cd ..
+  577  cd git/
+  578  make clean
+  579  make
+  580  make clean
+  581  make
+  582  make clean
+  583  make
+  584  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk
+  585  make all DEVKIT=icicle-kit-es
+  586  make clean
+  587  make all DEVKIT=icicle-kit-es
+  588  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  589  make all DEVKIT=icicle-kit-es
+  590  touch conf/
+  591  make all DEVKIT=icicle-kit-es
+  592  make linux-menuconfig
+  593  make all DEVKIT=icicle-kit-es
+  594  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  595  touch conf/
+  596  make all DEVKIT=icicle-kit-es
+  597  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  598  touch buildroot/
+  599  touch linux/
+  600  make all DEVKIT=icicle-kit-es
+  601  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  602  make all DEVKIT=icicle-kit-es
+  603  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  604  make all DEVKIT=icicle-kit-es
+  605  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  606  make all DEVKIT=icicle-kit-es
+  607  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  608  make all DEVKIT=icicle-kit-es
+  609  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  610  make all DEVKIT=icicle-kit-es
+  611  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  612  make all DEVKIT=icicle-kit-es
+  613  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  614  make all DEVKIT=icicle-kit-es
+  615  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  616  make all DEVKIT=icicle-kit-es
+  617  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  618  make all DEVKIT=icicle-kit-es
+  619  sudo make DISK=/dev/sdc DEVKIT=icicle-kit-es format-icicle-image
+  620  make all DEVKIT=icicle-kit-es
+  621  touch buildroot/
+  622  make all DEVKIT=icicle-kit-es
+  623  cd Project/Bitbucket/Buildroot/develop-can_usb_icicle/polarfire-soc-buildroot-sdk_wk_11012021
+  624  make linux-menuconfig 
+  625  make buildroot_rootfs-menuconfig 
+  626  make buildroot_initramfs-menuconfig 
+  627  make linux-menuconfig 
+  628  make 
+  629  make linux-menuconfig 
+  630  cd buildroot/
+  631  make menuconfig 
+  632  sudo minicom -s
+  633  sudo minicom -s
+  634  sudo fdisk -l
+  635  ls /dev/sda*
+  636  ls /dev/sd*
+  637  fdisk -l
+  638  sudo fdisk -l
+  639  cd Project/Bitbucket/Yocto/yocto-dev/
+  640  repo sync
+  641  repo rebase
+  642  repo sync
+  643  -j1 --fail-fast
+  644  repo sync -j1 --fail-fast
+  645  repo sync
+  646  redo repo sync
+  647  repo sync
+  648  repo update
+  649  repo sync
+  650  repo stanch
+  651  repo stash
+  652  stash
+  653  git stash
+  654  git status 
+  655  git stash
+  656  git status 
+  657  repo sync
+  658  git status
+  659  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  660  git stash list
+  661  git status -s
+  662  git stash list 
+  663  git stash
+  664  git stash 
+  665  cd ..
+  666  git stash 
+  667  cd yocto-dev/meta-polarfire-soc-yocto-bsp/
+  668  git stash 
+  669  repo sync
+  670  repo rebase
+  671  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  672  cd ..
+  673  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  674  . ./meta-polarfire-soc-yocto-bsp/polarfire-soc_yocto_setup.sh
+  675  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  676  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdX bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  677  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdc bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  678  sudo minicom -s
+  679  ls /dev/sd*
+  680  fdisk -l
+  681  sudo fdisk -l
+  682  sudo minicom -s
+  683  cd Project/Bitbucket/Yocto/yocto-dev/build/
+  684  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdc bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  685  umount /dev/sdc
+  686  ls /dev/sd*
+  687  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdc bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  688  cd Project/Bitbucket/Yocto/yocto-dev/build/
+  689  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdc bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  690  ls /dev/sd*
+  691  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdd bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  692  sudo fdisk -l
+  693  ls /dev/sd*
+  694  sudo fdisk -l
+  695  sudo minicom -s
+  696  sudo minicom -s
+  697  gtkterm
+  698  sudo apt install gtkterm
+  699  gtkterm
+  700  sudo minicom -s
+  701  ls /dev/sd*
+  702  sudo minicom -s
+  703  cd Project/Bitbucket/Yocto/yocto-dev/build/
+  704  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdcX bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  705  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdc bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  706  umount /dev/sdc*
+  707  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdc bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  708  cd 
+  709  cd Project/Bitbucket/Yocto/yocto-dev/
+  710  cd meta-openembedded/
+  711  reposync
+  712  repo sync
+  713  cd ..
+  714  cd meta-polarfire-soc-yocto-bsp/
+  715  repo sync
+  716  cd ..
+  717  cd openembedded-core/
+  718  repo sync
+  719  cd ..
+  720  cd meta-riscv/
+  721  repo sync
+  722  cd ..
+  723  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  724  . ./meta-polarfire-soc-yocto-bsp/polarfire-soc_yocto_setup.sh
+  725  MACHINE=icicle-kit-es bitbake mpfs-dev-cli
+  726  zcat tmp-glibc/deploy/images/icicle-kit-es/mpfs-dev-cli-icicle-kit-es.wic.gz | sudo dd of=/dev/sdc bs=4096 iflag=fullblock oflag=direct conv=fsync status=progress
+  727  v4l2-ctl --device /dev/video0 --set-fmt-video=width=640,height=480,pixelformat=MJPG
+  728  sudo minicom -s
+  729  sudo gtkterm
+  730  gtkterm
+  731  sudo gtkterm
+  732  gtkterm
+  733  sudo gtkterm
+  734  v4l2-ctl --stream-mmap --stream-count=100 -d /dev/video0
+  735  v4l2-ctl --set-parm=15;v4l2-ctl --set-fmt-video=width=640,height=480,pixelformat=YUYV --stream-mmap --stream-count=100 --stream-to=pics@sagar.jpeg
+  736  sudo apt update
+  737  sudo apt upgrade
+  738  pip3 install --user -U west
+  739  pip3 UNinstall --user -U west
+  740  pip3 uninstall --user -U west
+  741  pip3 uninstall west
+  742  west init ~/zephyrproject
+  743  pip3 install --user -U west
+  744  west init ~/zephyrproject
+  745  pip3 install --user -U west
+  746  sudo apt install --no-install-recommends git cmake ninja-build gperf   ccache dfu-util device-tree-compiler wget   python3-dev python3-pip python3-setuptools python3-tk python3-wheel xz-utils file   make gcc gcc-multilib g++-multilib libsdl2-dev
+  747  cmake --version
+  748  pip3 install --user -U west
+  749  echo 'export PATH=~/.local/bin:"$PATH"' >> ~/.bashrc
+  750  source ~/.bashrc
+  751  west init ~/zephyrproject
+  752  cd ~/zephyrproject/
+  753  west update
+  754  west zephyr-export
+  755  pip3 install --user -r ~/zephyrproject/zephyr/scripts/requirements.txt
+  756  cd ~
+  757  wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.12.1/zephyr-sdk-0.12.1-x86_64-linux-setup.run
+  758  chmod +x zephyr-sdk-0.12.1-x86_64-linux-setup.run
+  759  ./zephyr-sdk-0.12.1-x86_64-linux-setup.run -- -d ~/zephyr-sdk-0.12.1
+  760  sudo cp ~/zephyr-sdk-0.12.1/sysroots/x86_64-pokysdk-linux/usr/share/openocd/contrib/60-openocd.rules /etc/udev/rules.d
+  761  sudo udevadm control --reload
+  762  gedit /etc/udev/rules.d/60-openocd.rules 
+  763  sudo groupadd plugdev
+  764  lsusb
+  765  pip3 install --user -U west
+  766  echo 'export PATH=~/.local/bin:"$PATH"' >> ~/.bashrc
+  767  source ~/.bashrc
+  768  cd zephyrproject/
+  769  west build -b qemu_riscv64 samples/synchronization
+  770  ls
+  771  cd ..
+  772  cd zephyr-sdk-0.12.1/
+  773  west build -b qemu_riscv64 samples/synchronization
+  774  cd ..
+  775  cd zephyrproject/zephyr/
+  776  ls
+  777  west build -b qemu_riscv64 samples/synchronization
+  778  west build -t run
+  779  pwd
+  780  cd ~/Downloads
+  781  chmod +x Microchip-SoftConsole-v6.5.0.x-linux-x64-installer.run
+  782  ls
+  783  chmod +x Microchip-SoftConsole-v6.5-linux-x64-installer.run 
+  784  ./Microchip-SoftConsole-v6.5-linux-x64-installer.run 
+  785  apt-get install build-essential
+  786  sudo apt-get install build-essential 
+  787  apt-get install mono-complete gtk-sharp2 libcanberra-gtk-module
+  788  sudo apt-get install mono-complete gtk-sharp2 libcanberra-gtk-module
+  789  ls
+  790  cd /home/vidip/Microchip/SoftConsole-v6.5/
+  791  cd openocd/share/openocd/contrib/
+  792  sudo cp 60-openocd.rules /etc/udev/rules.d
+  793  sudo udevadm trigger
+  794  cd ../../../
+  795  cd bin/
+  796  ./openocd -f board/microsemi-riscv.cfg
+  797  ./openocd -c "set DEVICE MPFS" -f board/microsemi-riscv.cfg
+  798  ./softconsole.sh 
+  799  sudo minicom -s
+  800  sudo minicom -s
+  801  sudo zephyrproject/
+  802  cd zephyrproject/
+  803  cd zephyr/
+  804  west build -b m2gl025_miv
+  805  west clean
+  806  west build -t clean
+  807  west build -b m2gl025_miv
+  808  west build -p auto -b m2gl025 samples/basic/blinky
+  809  west build -p auto -b m2gl025_miv samples/basic/blinky
+  810  ninja clean
+  811  west build -t clean
+  812  ninja pristine
+  813  west build -b m2gl025_miv
+  814  cd ..
+  815  west build -b m2gl025_miv
+  816  west build -b reel_board samples/hello_world
+  817  cd zephyr/
+  818  west build -b reel_board samples/hello_world
+  819  mkdir build && cd build
+  820  cmake -GNinja -DBOARD=m2gl025_miv
+  821  ninja
+  822  west build -b boards/riscv/m2gl025_miv/
+  823  west build -b clean
+  824  west build -b qemu_riscv32 samples/synchronization
+  825  cmake -B build -GNinja -DBOARD=reel_board samples/hello_world
+  826  cd ..
+  827  cmake -B build -GNinja -DBOARD=reel_board samples/hello_world
+  828  west config build.generator "Unix Makefiles"
+  829  make -C build/
+  830  make
+  831  cd zephyr/
+  832  make
+  833  ls
+  834  cd boards/riscv/m2gl025_miv/
+  835  ls
+  836  cd ..
+  837  ls
+  838  cd tests/
+  839  ls
+  840  cd application_development/
+  841  ls
+  842  cd..
+  843  cd ..
+  844  west config build.generator "Unix Makefiles"
+  845  west build -b m2gl025_miv
+  846  make build -b m2gl025_miv
+  847  make m2gl025_miv
+  848  make clean
+  849  make configure 
+  850  make clean
+  851  west build -b reel_board samples/hello_world
+  852  cd build/
+  853  west build -b reel_board samples/hello_world
+  854  ls
+  855  cd ..
+  856  west build -b reel_board samples/
+  857  west build -b reel_board samples/hello_world
+  858  make clean
+  859  cd build/
+  860  make clean
+  861  cd ..
+  862  west build -b reel_board samples/hello_world
+  863  cmake -B build -GNinja -DBOARD=reel_board samples/hello_world
+  864  cmake -B build -GNinja -DBOARD=reel_board samples/blinky
+  865  cmake -B build -GNinja -DBOARD=reel_board samples/basic/blinky
+  866  cmake -B build -GNinja -DBOARD=reel_board samples/hello_world
+  867  cmake -B build -GNinja -DBOARD=reel_board samples/basic/blinky
+  868  cmake -B build -GNinja -DBOARD=reel_board samples/hello_world
+  869  cmake -B build -GNinja -DBOARD=reel_board samples/basic/blinky
+  870  cd Microchip/SoftConsole-v6.5
+  871  riscv-unknown-elf-gcc/bin/riscv64-unknown-elf-gdb -ex "target extended-remote localhost:3333" -ex "set mem inaccessible-by-default off" -ex "set arch riscv:rv32" -ex "set riscv use_compressed_breakpoints no" -ex "load" <path_to_executable>
+  872  /riscv-unknown-elf-gcc/bin/riscv64-unknown-elf-gdb -ex "target extended-remote localhost:3333" -ex "set mem inaccessible-by-default off" -ex "set arch riscv:rv32" -ex "set riscv use_compressed_breakpoints no" -ex "load" <path_to_executable>
+  873  cd riscv-unknown-elf-gcc/bin/
+  874  ls
+  875  riscv64-unknown-elf-gdb -ex "target extended-remote localhost:3333" -ex "set mem inaccessible-by-default off" -ex "set arch riscv:rv32" -ex "set riscv use_compressed_breakpoints no" 
+  876  ls
+  877  ./riscv64-unknown-elf-gdb -ex "target extended-remote localhost:3333" -ex "set mem inaccessible-by-default off" -ex "set arch riscv:rv32" -ex "set riscv use_compressed_breakpoints no" 
+  878  sudo gtkterm
+  879  ./softconsole
+  880  ./softconsole.sh
+  881  lsusb
+  882  cd Microchip/SoftConsole-v6.5/openocd/bin/
+  883  export LD_LIBRARY_PATH=$(pwd)
+  884  $LD_LIBRARY_PATH
+  885  ls
+  886  sudo LD_LIBRARY_PATH=$(pwd)
+  887  sudo LD_LIBRARY_PATH=$(pwd) \ 
+  888  cd ..
+  889  export SOFTCONSOLE_PATH=$(pwd)
+  890  $SOFTCONSOLE_PATH/
+  891* 
+  892  sudo LD_LIBRARY_PATH=$(SOFTCONSOLE_PATH)/bin \ $(SOFTCONSOLE_PATH)/openocd/bin/openocd --file \ $(SOFTCONSOLE_PATH)/openocd/share/openocd/scripts/board/microsemi-riscv.cfg
+  893  cd $(SOFTCONSOLE)/bin
+  894  cd $(SOFTCONSOLE_PATH)/bin
+  895  $SOFTCONSOLE_PATH
+  896  $(SOFTCONSOLE_PATH)
+  897  sudo LD_LIBRARY_PATH=$SOFTCONSOLE_PATH/bin \ $SOFTCONSOLE_PATH/openocd/bin/openocd --file \ $SOFTCONSOLE_PATH/openocd/share/openocd/scripts/board/microsemi-riscv.cfg
+  898  sudo LD_LIBRARY_PATH=$SOFTCONSOLE_PATH/bin \ $SOFTCONSOLE_PATH/openocd/bin/openocd --file \ $SOFTCONSOLE_PATH/share/openocd/scripts/board/microsemi-riscv.cfg
+  899  sudo LD_LIBRARY_PATH=$SOFTCONSOLE_PATH/bin \ $SOFTCONSOLE_PATH/bin/openocd --file \ $SOFTCONSOLE_PATH/share/openocd/scripts/board/microsemi-riscv.cfg
+  900  $SOFTCONSOLE_PATH
+  901  sudo LD_LIBRARY_PATH=$SOFTCONSOLE_PATH/bin \ $SOFTCONSOLE_PATH/bin/openocd --file \ $SOFTCONSOLE_PATH/share/openocd/scripts/board/microsemi-riscv.cfg
+  902  pwd
+  903  cd /home/vidip/Microchip/SoftConsole-v6.5/openocd/bin/
+  904  ls
+  905  sudo LD_LIBRARY_PATH=$SOFTCONSOLE_PATH/bin \ $SOFTCONSOLE_PATH/bin/openocd --file \ $SOFTCONSOLE_PATH/share/openocd/scripts/board/microsemi-riscv.cfg
+  906  ./openocd -c "set DEVICE MPFS" -f board/microsemi-riscv.cfg
+  907  cd zephyrproject/
+  908  west build -b m2gl025_miv
+  909  west build -b reel_board samples/hello_world
+  910  cd zephyr/
+  911  west build -b qemu_riscv64 samples/synchronization
+  912  west build -b m2gl025_miv
+  913  west build -b qemu_riscv64 samples/synchronization
+  914  west build -b reel_board samples/hello_world
+  915  west build -b m2gl025_miv samples/hello_world
+  916  west build -b qemu_riscv64 samples/synchronization
+  917  west build -b m2gl025_miv samples/hello_world
+  918  sudo LD_LIBRARY_PATH=$SOFTCONSOLE_PATH/bin \ $SOFTCONSOLE_PATH/bin/openocd --file \ $SOFTCONSOLE_PATH/share/openocd/scripts/board/microsemi-riscv.cfg
+  919  sudo LD_LIBRARY_PATH=$SOFTCONSOLE_PATH/bin \ $SOFTCONSOLE_PATH/openocd/bin/openocd --file \ $SOFTCONSOLE_PATH/share/openocd/scripts/board/microsemi-riscv.cfg
+  920  history 
+  921  history > test.txt
