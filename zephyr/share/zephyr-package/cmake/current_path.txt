@@ -1,0 +1,1 @@
+/home/vidip/zephyrproject/zephyr/share/zephyr-package/cmake
