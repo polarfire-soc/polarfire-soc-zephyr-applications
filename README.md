@@ -28,7 +28,7 @@ $ sudo pip3 install --system west
 
 ### Clone this repository
 ```
-$ git clone https://bitbucket.microchip.com/scm/fpga_pfsoc_es/polarfire-soc-zephyr-applications.git
+$ git clone https://github.com/polarfire-soc/polarfire-soc-zephyr-applications.git
 ```
 
 ### Install Zephyr OS additional Python dependencies
