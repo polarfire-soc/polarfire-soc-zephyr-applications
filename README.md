@@ -59,6 +59,7 @@ $ cd zephyr
 $ west init -l
 $ cd ../
 $ west update
+$ west zephyr-export
 $ source zephyr/zephyr-env.sh
 ```
 
