@@ -5,7 +5,7 @@
  */
 
 /dts-v1/;
-#include <microsemi-icicle.dtsi>
+#include <mpfs-icicle.dtsi>
 
 / {
 	model = "SiFive HiFive 1";

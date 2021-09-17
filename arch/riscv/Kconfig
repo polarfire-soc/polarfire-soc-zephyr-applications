@@ -135,6 +135,9 @@ endmenu
 config MAIN_STACK_SIZE
 	default 4096 if 64BIT
 
+config IDLE_STACK_SIZE
+	default 4096 if 64BIT
+
 config TEST_EXTRA_STACKSIZE
 	default 1024 if 64BIT
 

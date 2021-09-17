@@ -3,7 +3,7 @@
 if SOC_SERIES_RISCV64_MIV
 
 config SOC_SERIES
-	default "icicle"
+	default "mpfs"
 
 config SYS_CLOCK_HW_CYCLES_PER_SEC
 	default 660000
