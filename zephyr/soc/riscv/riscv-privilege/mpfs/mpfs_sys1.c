@@ -5,7 +5,7 @@
  */
 
 #include <init.h>
-#include "icicle_sys.h"
+#include "mpfs_sys.h"
 #include "encoding.h"
 #include "mss_plic.h"
 #include "mss_hart_ints.h"

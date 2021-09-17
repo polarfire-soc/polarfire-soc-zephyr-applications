@@ -5,7 +5,7 @@
  */
 
 #include <init.h>
-#include "icicle_sys.h"
+#include "mpfs_sys.h"
 #include "encoding.h"
 #include "mss_sysreg.h"
 #include "mss_plic.h"
@@ -22,7 +22,7 @@ uint32_t a_gpio[5] = {0x00};
 volatile uint32_t * p_subblock = (volatile uint32_t* )(0x20122084);
 volatile uint32_t * p_softreset = (volatile uint32_t* )(0x20122088);
 
-static int pre_icicle_init(const struct device *dev)
+static int pre_mpfs_init(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 
@@ -32,7 +32,7 @@ static int pre_icicle_init(const struct device *dev)
    SYSREG->SUBBLK_CLOCK_CR = 0xffffffff;
 }
 
-static int icicle_init(const struct device *dev)
+static int mpfs_init(const struct device *dev)
 {
 	ARG_UNUSED(dev);
      int int_num, i;
@@ -174,6 +174,6 @@ uint8_t  icicleIRQHandler(void)
     return 0;
 }
 
-SYS_INIT(pre_icicle_init, PRE_KERNEL_1, 0);
-SYS_INIT(icicle_init, PRE_KERNEL_1, 2);
+SYS_INIT(pre_mpfs_init, PRE_KERNEL_1, 0);
+SYS_INIT(mpfs_init, PRE_KERNEL_1, 2);
 

@@ -4,8 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 config SOC_SERIES_RISCV64_MIV
-	bool "Microsemi MPFS implementation"
+	bool "Microchip RV64 implementation"
 	select RISCV
 	select SOC_FAMILY_RISCV_PRIVILEGE
 	help
-	  Enable support for Microsemi ICICLE
+	  Enable support for Microchip RISCV 64bit

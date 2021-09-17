@@ -1,5 +1,5 @@
-identifier: mpfs250t
-name: Microsemi PolarFire ICICL kit
+identifier: mpfs_icicle
+name: Microsemi PolarFire ICICLE kit
 type: mcu
 arch: riscv64
 toolchain:

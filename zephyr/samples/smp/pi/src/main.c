@@ -17,7 +17,7 @@
 #define DIGITS_NUM	240
 
 #define LENGTH		((DIGITS_NUM / 4) * 14)
-#define STACK_SIZE	((LENGTH * sizeof(int) + 512) + \
+#define STACK_SIZE	((LENGTH * sizeof(int) + 2048) + \
 			 CONFIG_TEST_EXTRA_STACKSIZE)
 
 #ifdef CONFIG_SMP
@@ -28,15 +28,26 @@
 
 static K_THREAD_STACK_ARRAY_DEFINE(tstack, THREADS_NUM, STACK_SIZE);
 static struct k_thread tthread[THREADS_NUM];
+#if defined(CONFIG_SOC_MPFS)
+static char buffer[THREADS_NUM][DIGITS_NUM + 9];
+#else
 static char buffer[THREADS_NUM][DIGITS_NUM + 1];
+#endif
 static atomic_t counter = THREADS_NUM;
 
 void test_thread(void *arg1, void *arg2, void *arg3)
 {
 	atomic_t *counter = (atomic_t *)arg1;
 	char *buffer = (char *)arg2;
+    unsigned int hart_id;
 
 	ARG_UNUSED(arg3);
+
+#if defined(CONFIG_SOC_MPFS)
+    __asm__ volatile("csrr %0, mhartid" : "=r" (hart_id));
+    sprintf(buffer, "HART[%u] ", hart_id);
+    buffer += 8;
+#endif
 
 	/*
 	 * Adapted and improved (for random number of digits) version of Pi

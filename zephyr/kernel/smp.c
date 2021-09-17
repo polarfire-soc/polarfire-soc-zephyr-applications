@@ -16,10 +16,19 @@ static atomic_t start_flag;
 
 unsigned int z_smp_global_lock(void)
 {
+#if defined(CONFIG_SOC_MPFS)
+	/* Debugging in SoftConsole has a problem with breaking on empty loops
+	 * so add in dummy to allow me debug this... (PMCS)
+	 */
+    volatile int dummy = 0;
+#endif
 	unsigned int key = arch_irq_lock();
 
 	if (!_current->base.global_lock_count) {
 		while (!atomic_cas(&global_lock, 0, 1)) {
+#if defined(CONFIG_SOC_MPFS)
+		    dummy++;
+#endif
 		}
 	}
 

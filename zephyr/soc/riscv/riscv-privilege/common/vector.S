@@ -25,16 +25,22 @@ SECTION_FUNC(vectors, __start)
 	 */
 	la t0, __irq_wrapper
 	csrw mtvec, t0
-	/*
-	 * For MPFS and FU540 only allow setting STVEC on U54 as E51 does not have
-	 * this register.
-	 */
 #if defined(CONFIG_BOARD_HART_TO_USE) && (CONFIG_BOARD_HART_TO_USE != 0)
     /* Set up dummy vector routine to catch supervisor traps in case of
      * problems.
      */
+#if defined(CONFIG_SOC_MPFS)
+    /*
+     * For MPFS and FU540 only allow setting STVEC on U54 as E51 does not have
+     * this register. On these SOCs, not setting STVEC can cause unexpected traps...
+     */
+    csrr t0, mhartid
+    beqz t0, skip_svect
+#endif
 	la t0, __irq_wrapper_s
 	csrw stvec, t0
+
+skip_svect:
 #endif
 	/* Jump to __initialize */
 	tail __initialize
