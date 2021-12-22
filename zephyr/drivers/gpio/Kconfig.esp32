@@ -1,0 +1,10 @@
+# ESP32 GPIO configuration options
+
+# Copyright (c) 2017 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+config GPIO_ESP32
+	bool "ESP32 GPIO"
+	depends on SOC_ESP32 || SOC_ESP32S2 || SOC_ESP32C3
+	help
+	  Enables the ESP32 GPIO driver
