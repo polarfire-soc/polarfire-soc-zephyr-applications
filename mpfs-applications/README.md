@@ -22,7 +22,7 @@ and timing are operating correctly.
 
 To build this application and generate an eclipse project configuration file which can be used in Microchip SoftConsole:
 ```
-$ west build -p -b mpfs_icicle mpfs-applications/synchronization -- -DDTC_OVERLAY_FILE=$ZEPHYR_BASE/boards/riscv/mpfs_icicle/mpfs_icicle_ddr.overlay -G "Eclipse CDT4 - Unix Makefiles"
+$ west build -p -b mpfs_icicle mpfs-applications/synchronization -G "Eclipse CDT4 - Unix Makefiles"
 ```
 
 
@@ -45,7 +45,7 @@ number of threads to use (``THREADS_NUM``).
 
 To build this application and generate an eclipse project configuration file which can be used in Microchip SoftConsole:
 ```
-$ west build -p -b mpfs_icicle mpfs-applications/smp/pi -- -DDTC_OVERLAY_FILE=$ZEPHYR_BASE/boards/riscv/mpfs_icicle/mpfs_icicle_ddr.overlay -G "Eclipse CDT4 - Unix Makefiles"
+$ west build -p -b mpfs_icicle mpfs-applications/smp/pi - G "Eclipse CDT4 - Unix Makefiles"
 ```
 
 ### Zephyr OS Application Build Directory
