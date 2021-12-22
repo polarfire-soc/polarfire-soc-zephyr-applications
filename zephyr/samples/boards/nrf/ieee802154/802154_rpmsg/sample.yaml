@@ -1,4 +1,0 @@
-sample:
-  description: Allows Zephyr to provide 802.15.4 connectivity
-    for nRF devices via RPMsg.
-  name: 802.15.4 RPMsg serialization
