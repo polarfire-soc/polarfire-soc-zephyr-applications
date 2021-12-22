@@ -1,0 +1,214 @@
+# Copyright (c) 2016 Jean-Paul Etienne <fractalclone@gmail.com>
+# SPDX-License-Identifier: Apache-2.0
+
+menu "RISCV Options"
+	depends on RISCV
+
+config ARCH
+	string
+	default "riscv64" if 64BIT
+	default "riscv32"
+
+config COMPRESSED_ISA
+	bool
+	default y if 64BIT
+
+config FLOAT_HARD
+	bool "Enable hard-float calling convention"
+	default y
+	depends on FPU
+	help
+	  This option enables the hard-float calling convention.
+
+menu "RISCV Processor Options"
+
+config CORE_E31
+	bool "Use E31 core"
+	select RISCV_PMP
+	select ARCH_HAS_USERSPACE
+	select ARCH_HAS_STACK_PROTECTION if PMP_STACK_GUARD
+	default n
+	help
+	  This option signifies the use of a core of the E31 family.
+
+config INCLUDE_RESET_VECTOR
+	bool "Include Reset vector"
+	help
+	  Include the reset vector stub, which initializes the stack and
+	  prepares for running C code.
+
+config RISCV_SOC_CONTEXT_SAVE
+	bool "Enable SOC-based context saving in IRQ handlers"
+	select RISCV_SOC_OFFSETS
+	help
+	  Enable low-level SOC-specific context management, for SOCs
+	  with extra state that must be saved when entering an
+	  interrupt/exception, and restored on exit. If unsure, leave
+	  this at the default value.
+
+	  Enabling this option requires that the SoC provide a
+	  soc_context.h header which defines the following macros:
+
+	  - SOC_ESF_MEMBERS: structure component declarations to
+	    allocate space for. The last such declaration should not
+	    end in a semicolon, for portability. The generic RISC-V
+	    architecture code will allocate space for these members in
+	    a "struct soc_esf" type (typedefed to soc_esf_t), which will
+	    be available if arch.h is included.
+
+	  - SOC_ESF_INIT: structure contents initializer for struct soc_esf
+	    state. The last initialized member should not end in a comma.
+
+	  The generic architecture IRQ wrapper will also call
+	  \_\_soc_save_context and \_\_soc_restore_context routines at
+	  ISR entry and exit, respectively. These should typically
+	  be implemented in assembly. If they were C functions, they
+	  would have these signatures:
+
+	  ``void __soc_save_context(soc_esf_t *state);``
+
+	  ``void __soc_restore_context(soc_esf_t *state);``
+
+	  The calls obey standard calling conventions; i.e., the state
+	  pointer address is in a0, and ra contains the return address.
+
+config RISCV_SOC_OFFSETS
+	bool "Enable SOC-based offsets"
+	help
+	  Enabling this option requires that the SoC provide a soc_offsets.h
+	  header which defines the following macros:
+
+	  - GEN_SOC_OFFSET_SYMS(): a macro which expands to
+	    GEN_OFFSET_SYM(soc_esf_t, soc_specific_member) calls
+	    to ensure offset macros for SOC_ESF_MEMBERS are defined
+	    in offsets.h. The last one should not end in a semicolon.
+	    See gen_offset.h for more details.
+
+config RISCV_SOC_INTERRUPT_INIT
+	bool "Enable SOC-based interrupt initialization"
+	help
+	  Enable SOC-based interrupt initialization
+	  (call soc_interrupt_init, within _IntLibInit when enabled)
+
+config RISCV_GENERIC_TOOLCHAIN
+	bool "Compile using generic riscv32 toolchain"
+	default y
+	help
+	  Compile using generic riscv32 toolchain.
+	  Allow SOCs that have custom extended riscv ISA to still
+	  compile with generic riscv32 toolchain.
+
+config RISCV_HAS_CPU_IDLE
+	bool "Does SOC has CPU IDLE instruction"
+	help
+	  Does SOC has CPU IDLE instruction
+
+config GEN_ISR_TABLES
+	default y
+
+config GEN_IRQ_VECTOR_TABLE
+	default n
+
+config NUM_IRQS
+	int
+
+config HAS_MONITOR_HART
+	bool "Does SOC have monitor hart with different capabilities to application harts"
+	default n
+	help
+	  SOC has monitor hart such as the e51 on MPFS and FU540 which has different
+	  capabilities to the other harts in the SOC. This may be important for SMP
+	  setups where the monitor hart may not be suitable for inclusion in the SMP
+	  operation.
+	  
+config MONITOR_HART_ID
+	int "Hart id for monitor hart"
+	default 0
+	help
+	  If the SOC has monitor hart such as the e51 on MPFS and FU540 this is
+	  the mhartid value for the monitor hart.
+	  
+config MONITOR_HART_SUPERVISOR
+	bool "Monitor hart supports supervisor mode"
+	default n
+	help
+	  If the SOC has monitor hart, this flag indicates if it supports supervisor
+	  mode. Many monitor harts such as the e51 on MPFS and FU540 do not support
+	  supervisor mode.
+	  
+config SUPERVISOR_MODE_CAPABLE
+	bool "Indicates that supervisor mode is available"
+	default y
+	help
+	  Indicates supervisor mode is supported by the device. This may mean we need
+	  to implement supervisor specific code even if Zephyr is not using this mode.
+	  Please note, not all harts on a device might support supervisor mode so this
+	  is not a carte blanche.
+
+config NO_SUPERVISOR_DELEGATION
+	bool "For harts which support supervisor mode, force clearing of delegation bits"
+	default y
+	help
+	  Force clearing of supervisor delegation bits on start up to avoid unexpected
+	  exceptions.
+
+config SET_SUPERVISOR_HANDLER
+	bool "Set up a dummy handler to catch unexpected supervisor traps"
+	default n
+	help
+	  Setup a dummy trap handler for supervisor exceptions. This may be required for 
+	  system stability to avoid unexpected behaviour if a supervisor trap triggers.
+
+config HART_TO_USE
+	int "Select single hart to run Zephyr on, or start up hart in SMP mode"
+	range 0 4
+	default 0
+	help
+	  For non SMP setups this indicates which hart we are running Zephyr on. For SMP
+	  setups this indicates which hart will take care of system startup.
+	  
+config CLEAR_PMP_REGS
+	bool "Do we need to clear the PMP registers on startup"
+	default n
+	help
+	  Typically, on RISC-V setups, the PMP registers are left with random values
+	  on power up. The values are supposed to be benign but sometimes there can be
+	  issues. If the registers are not set to valid values by the bootloader or other
+	  agent, then zeroing them can help with system stability.
+	  
+menuconfig RISCV_PMP
+	bool "RISC-V PMP Support"
+	default n
+	select THREAD_STACK_INFO
+	select CPU_HAS_MPU
+	select MPU
+	select SRAM_REGION_PERMISSIONS
+	select ARCH_MEM_DOMAIN_SYNCHRONOUS_API if USERSPACE
+	select PMP_POWER_OF_TWO_ALIGNMENT if USERSPACE
+	help
+	  MCU implements Physical Memory Protection.
+	  Memory protection against read-only area writing
+	  is natively supported on real HW.
+
+if RISCV_PMP
+source "arch/riscv/core/pmp/Kconfig"
+endif #RISCV_PMP
+
+endmenu
+
+config MAIN_STACK_SIZE
+	default 4096 if 64BIT
+
+config IDLE_STACK_SIZE
+	default 4096 if 64BIT
+
+config TEST_EXTRA_STACKSIZE
+	default 1024 if 64BIT
+
+config CMSIS_THREAD_MAX_STACK_SIZE
+	default 1024 if 64BIT
+
+config CMSIS_V2_THREAD_MAX_STACK_SIZE
+	default 1024 if 64BIT
+
+endmenu

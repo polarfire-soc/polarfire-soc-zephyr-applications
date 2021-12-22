@@ -1,0 +1,124 @@
+/*
+ * Copyright (c) ITE, All Rights Reserved
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <it8xxx2.dtsi>
+#include <it8xxx2-alts-map.dtsi>
+
+/ {
+	model = "IT8XXX2 EV-Board";
+	compatible = "riscv,it8xxx2-evb";
+
+	aliases {
+		pwm-led0 = &led0;
+		pwm-led1 = &led1;
+	};
+
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &uart1;
+		zephyr,bt-uart = &uart2;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		zephyr,flash-controller = &flashctrl;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,keyboard-scan = &kscan0;
+	};
+
+	pwmleds {
+		compatible = "pwm-leds";
+		/* NOTE: &pwm number needs same with channel number */
+		led0: led_0 {
+			pwms = <&pwm7 PWM_CHANNEL_7 PWM_POLARITY_INVERTED>;
+			label = "LED0_GREEN";
+		};
+		led1: led_1 {
+			pwms = <&pwm0 PWM_CHANNEL_0 PWM_POLARITY_NORMAL>;
+			label = "LED1_BLUE";
+		};
+	};
+};
+&adc0 {
+	status = "okay";
+};
+&i2c0 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+};
+&i2c1 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+};
+&i2c2 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+};
+&i2c3 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+};
+&i2c4 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+};
+&i2c5 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+};
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	clock-frequency = <1804800>;
+};
+&uart2 {
+	status = "okay";
+	current-speed = <460800>;
+	clock-frequency = <1804800>;
+};
+&pwm0 {
+	status = "okay";
+	prescaler-cx = <PWM_PRESCALER_C6>;
+	/*
+	 * If we need pwm output in ITE chip power saving mode,
+	 * then we should set frequency <=324Hz.
+	 */
+	pwm-output-frequency = <324>;
+};
+&pwm7 {
+	status = "okay";
+	prescaler-cx = <PWM_PRESCALER_C4>;
+	pwm-output-frequency = <30000>;
+};
+&kscan0 {
+	status = "okay";
+};
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0x20000>;
+		};
+		slot0_partition: partition@20000 {
+			label = "image-0";
+			reg = <0x00020000 0x20000>;
+		};
+		slot1_partition: partition@40000 {
+			label = "image-1";
+			reg = <0x00040000 0x10000>;
+		};
+		scratch_partition: partition@50000 {
+			label = "image-scratch";
+			reg = <0x00050000 0x10000>;
+		};
+		storage_partition: partition@60000 {
+			label = "storage";
+			reg = <0x00060000 0x20000>;
+		};
+	};
+};
