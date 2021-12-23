@@ -78,8 +78,8 @@ manifest:
       groups:
         - hal
     - name: hal_microchip
-      url: https://bitbucket.microchip.com/scm/fpga_pfsoc_es/zephyr-mpfs-hal_microchip.git
-      revision: b582e104bd60ad42e3599930e662975164c39386
+      url: https://github.com/polarfire-soc/zephyr-mpfs-hal_microchip.git
+      revision: 189945878c1945b80132616fb30e41f5394c3e72
       path: modules/hal/microchip
       groups:
         - hal
