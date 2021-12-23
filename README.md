@@ -37,7 +37,7 @@ $ source zephyr/zephyr-env.sh
 
 To build a zephyr application, use the command:
 ```
-$ west build -p -b mpfs_icicle <application> -- -DDTC_OVERLAY_FILE=$ZEPHYR_BASE/boards/riscv/mpfs_icicle/mpfs_icicle_ddr.overlay -G "Eclipse CDT4 - Unix Makefiles"
+$ west build -p -b mpfs_icicle <application> -G "Eclipse CDT4 - Unix Makefiles"
 ```
 
 Where `mpfs_icicle` is the supported board for the PolarFire SoC Icicle Kit, `<application>` is the Zephyr OS application.
