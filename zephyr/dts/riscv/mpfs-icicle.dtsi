@@ -16,7 +16,8 @@
 			compatible = "microsemi,miv", "riscv";
 			device_type = "cpu";
 			reg = < 0x00 >;
-			riscv,isa = "rv64imac";
+/*			riscv,isa = "rv64imac"; */
+			riscv,isa = "rv64imafdc";
 			hlic: interrupt-controller {
 				#interrupt-cells = <1>;
 				compatible = "riscv,cpu-intc";

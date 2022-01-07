@@ -5,3 +5,4 @@ config BOARD_MPFS_ICICLE
 	depends on SOC_MPFS
 	select 64BIT
     select SCHED_IPI_SUPPORTED
+	select CPU_HAS_FPU_DOUBLE_PRECISION

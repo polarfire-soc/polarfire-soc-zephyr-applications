@@ -34,7 +34,10 @@ config MAX_IRQ_PER_AGGREGATOR
 
 config NUM_IRQS
 	default 187
-	
+
+config ZTEST_STACKSIZE
+	default 4096 if ZTEST
+
 # config NO_OPTIMIZATIONS
 #	default y
 	
