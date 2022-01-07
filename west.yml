@@ -79,7 +79,7 @@ manifest:
         - hal
     - name: hal_microchip
       url: https://github.com/polarfire-soc/zephyr-mpfs-hal_microchip.git
-      revision: 189945878c1945b80132616fb30e41f5394c3e72
+      revision: 6ee1e14ee63ef79360fb619ee3df5bd2747fb0b9
       path: modules/hal/microchip
       groups:
         - hal

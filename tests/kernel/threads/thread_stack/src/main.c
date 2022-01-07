@@ -16,7 +16,7 @@
  */
 struct k_thread test_thread;
 #define NUM_STACKS	3
-#define STEST_STACKSIZE	(512 + CONFIG_TEST_EXTRA_STACKSIZE)
+#define STEST_STACKSIZE	(2048 + CONFIG_TEST_EXTRA_STACKSIZE)
 K_THREAD_STACK_DEFINE(user_stack, STEST_STACKSIZE);
 K_THREAD_STACK_ARRAY_DEFINE(user_stack_array, NUM_STACKS, STEST_STACKSIZE);
 K_KERNEL_STACK_DEFINE(kern_stack, STEST_STACKSIZE);
@@ -378,8 +378,8 @@ void test_stack_buffer(void)
 	printk("CONFIG_ISR_STACK_SIZE %zu\n", (size_t)CONFIG_ISR_STACK_SIZE);
 	for (int i = 0; i < CONFIG_MP_NUM_CPUS; i++) {
 		printk("irq stack %d: %p size %zu\n",
-		       i, &z_interrupt_stacks[i],
-		       sizeof(z_interrupt_stacks[i]));
+		       i, &z_interrupt_stacks[i + CONFIG_SMP_BASE_CPU],
+		       sizeof(z_interrupt_stacks[i + CONFIG_SMP_BASE_CPU]));
 	}
 
 	printk("Provided stack size: %u\n", STEST_STACKSIZE);
