@@ -46,7 +46,8 @@ The table below lists the current applications available for PolarFire Soc Icicl
 
 | `application` |
 | --- | 
-| `mpfs-applications/synchronization` |  
+| `mpfs-applications/synchronization` |
+| `mpfs-applications/synchronization_blinky` |  
 | `mpfs-applications/smp/pi` | 
 
 
