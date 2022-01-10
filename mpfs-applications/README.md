@@ -13,7 +13,7 @@ $ source zephyr/zephyr-env.sh
 
 
 
-### Single CPU Support
+### Thread Synchronization Support
 A simple application that demonstrates basic sanity of the kernel.
 Two threads (A and B) take turns printing a greeting message to the console,
 and use sleep requests and semaphores to control the rate at which messages
@@ -46,6 +46,13 @@ number of threads to use (``THREADS_NUM``).
 To build this application and generate an eclipse project configuration file which can be used in Microchip SoftConsole:
 ```
 $ west build -p -b mpfs_icicle mpfs-applications/smp/pi - G "Eclipse CDT4 - Unix Makefiles"
+```
+
+### GPIO Example
+This sample application extends the synchronization application by toggling the leds on the PolarFire-SoC Icicle Kit. It makes use of the mss_gpio driver that gets included along with the mpfs_hal when imported as a module.
+To build this application and generate an eclipse project configuration file which can be used in Microchip SoftConsole:
+```
+$ west build -p -b mpfs_icicle mpfs-applications/synchronization_blinky -G "Eclipse CDT4 - Unix Makefiles"
 ```
 
 ### Zephyr OS Application Build Directory
