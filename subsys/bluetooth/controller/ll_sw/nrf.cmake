@@ -17,6 +17,10 @@ if(CONFIG_BT_LL_SW_SPLIT)
       CONFIG_BT_CTLR_ADV_PERIODIC
       ll_sw/nordic/lll/lll_adv_sync.c
       )
+    zephyr_library_sources_ifdef(
+      CONFIG_BT_CTLR_ADV_ISO
+      ll_sw/nordic/lll/lll_adv_iso.c
+      )
   endif()
   if(CONFIG_BT_OBSERVER)
     zephyr_library_sources(
@@ -29,6 +33,10 @@ if(CONFIG_BT_LL_SW_SPLIT)
     zephyr_library_sources_ifdef(
       CONFIG_BT_CTLR_SYNC_PERIODIC
       ll_sw/nordic/lll/lll_sync.c
+      )
+    zephyr_library_sources_ifdef(
+      CONFIG_BT_CTLR_SYNC_ISO
+      ll_sw/nordic/lll/lll_sync_iso.c
       )
   endif()
   if(CONFIG_BT_CONN)
@@ -68,6 +76,11 @@ if(CONFIG_BT_LL_SW_SPLIT)
     CONFIG_BT_CTLR_PERIPHERAL_ISO
     ll_sw/nordic/lll/lll_peripheral_iso.c
     )
+  if(CONFIG_BT_CTLR_ISO)
+    zephyr_library_sources(
+      ll_sw/nordic/ull/ull_iso_vendor.c
+      )
+  endif()
 endif()
 
 zephyr_library_sources(
@@ -86,4 +99,10 @@ zephyr_library_sources_ifdef(
 zephyr_library_include_directories(
   ll_sw/nordic
   hci/nordic
+)
+
+# This path needs to be added globally as it is supposed to be used
+# in nrfx_glue.h when other libraries are built.
+zephyr_include_directories(
+  ll_sw/nordic/hal/nrf5/nrfx_glue
 )

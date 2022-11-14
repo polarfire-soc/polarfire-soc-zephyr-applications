@@ -7,7 +7,7 @@
 #ifndef __SOC_FLASH_NRF_H__
 #define __SOC_FLASH_NRF_H__
 
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <soc.h>
 
 #define FLASH_OP_DONE    (0) /* 0 for compliance with the driver API. */
@@ -29,17 +29,12 @@ struct flash_context {
 
 #ifndef CONFIG_SOC_FLASH_NRF_RADIO_SYNC_NONE
 
-#if defined(CONFIG_SOC_FLASH_NRF_PARTIAL_ERASE)
-/* The timeout is multiplied by 1.5 because switching tasks may take
- * significant portion of time.
+/* The timeout is multiplied by CONFIG_SOC_FLASH_NRF_TIMEOUT_MULTIPLIER/10
+ * because switching tasks may take a significant portion of time.
  */
 #define FLASH_TIMEOUT_MS ((FLASH_PAGE_ERASE_MAX_TIME_US) * \
-			  (FLASH_PAGE_MAX_CNT) / 1000 * 15 / 10)
-#else
-
-#define FLASH_TIMEOUT_MS ((FLASH_PAGE_ERASE_MAX_TIME_US) * \
-			  (FLASH_PAGE_MAX_CNT) / 1000)
-#endif /* CONFIG_SOC_FLASH_NRF_PARTIAL_ERASE */
+			  (FLASH_PAGE_MAX_CNT) / 1000 * \
+			  CONFIG_SOC_FLASH_NRF_TIMEOUT_MULTIPLIER / 10)
 
 /**
  * @defgroup nrf_flash_sync sync backend API
@@ -81,7 +76,7 @@ int nrf_flash_sync_init(void);
 void nrf_flash_sync_set_context(uint32_t duration);
 
 /**
- * Check if the operation need to be run synchonous with radio.
+ * Check if the operation need to be run synchronous with radio.
  *
  * @retval True if operation need to be run synchronously, otherwise False
  */
@@ -90,10 +85,10 @@ bool nrf_flash_sync_is_required(void);
 /**
  * Execute the flash operation synchronously along the radio operations.
  *
- * Function executes calbacks op_desc->handler() in execution windows according
+ * Function executes callbacks op_desc->handler() in execution windows according
  * to timing settings requested by nrf_flash_sync_set_context().
  * This routine need to be called the handler as many time as it returns
- * FLASH_OP_ONGOING, howewer an operation timeot should be implemented.
+ * FLASH_OP_ONGOING, however an operation timeout should be implemented.
  * When the handler() returns FLASH_OP_DONE or an error code, no further
  * execution windows are needed so function should return as the handler()
  * finished its operation.
@@ -173,7 +168,7 @@ int nrf_flash_sync_exe(struct flash_op_desc *op_desc);
 /**
  * Get timestamp and store it in synchronization backend
  * context data as operation beginning time reference.
- * This timestapm will be used by @ref nrf_flash_sync_check_time_limit()
+ * This timestamp will be used by @ref nrf_flash_sync_check_time_limit()
  * as the execution window begin reference.
  */
 void nrf_flash_sync_get_timestamp_begin(void);
@@ -181,7 +176,7 @@ void nrf_flash_sync_get_timestamp_begin(void);
 /**
  * Estimate whether next iteration will fit in time constraints.
  * This function fetch current timestamp and compare it with the operation
- * beginning timestamp referene stored by
+ * beginning timestamp reference stored by
  * @ref nrf_flash_sync_get_timestamp_begin() in the synchronization backend
  * context data.
  *

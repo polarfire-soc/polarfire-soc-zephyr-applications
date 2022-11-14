@@ -12,6 +12,7 @@ zephyr_library_sources_ifdef(CONFIG_BT_RFCOMM           rfcomm.c)
 zephyr_library_sources_ifdef(CONFIG_BT_TESTING          testing.c)
 zephyr_library_sources_ifdef(CONFIG_BT_SETTINGS         settings.c)
 zephyr_library_sources_ifdef(CONFIG_BT_HOST_CCM         aes_ccm.c)
+zephyr_library_sources_ifdef(CONFIG_BT_LONG_WQ          long_wq.c)
 
 zephyr_library_sources_ifdef(
   CONFIG_BT_BREDR
@@ -87,11 +88,6 @@ if(CONFIG_BT_HCI_HOST)
   endif()
 endif()
 
-if(CONFIG_BT_WHITELIST)
-  message(WARNING "CONFIG_BT_WHITELIST is deprecated.
-  Please use CONFIG_BT_FILTER_ACCEPT_LIST instead."
-    )
-endif()
 if(CONFIG_BT_DEBUG_SMP OR CONFIG_BT_DEBUG_KEYS OR CONFIG_BT_LOG_SNIFFER_INFO)
   message(WARNING "One of these options are enabled:
   CONFIG_BT_DEBUG_SMP CONFIG_BT_DEBUG_KEYS CONFIG_BT_LOG_SNIFFER_INFO.

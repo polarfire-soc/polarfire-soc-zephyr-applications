@@ -9,12 +9,14 @@
  * @brief System/hardware module for STM32F7 processor
  */
 
-#include <kernel.h>
-#include <device.h>
-#include <init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
 #include <soc.h>
-#include <arch/cpu.h>
-#include <arch/arm/aarch32/cortex_m/cmsis.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/arch/arm/aarch32/cortex_m/cmsis.h>
+#include <zephyr/arch/arm/aarch32/nmi.h>
+#include <zephyr/irq.h>
 #include <stm32_ll_system.h>
 
 /**
@@ -37,8 +39,11 @@ static int st_stm32f7_init(const struct device *arg)
 	key = irq_lock();
 
 	SCB_EnableICache();
-	if (!(SCB->CCR & SCB_CCR_DC_Msk)) {
-		SCB_EnableDCache();
+
+	if (IS_ENABLED(CONFIG_DCACHE)) {
+		if (!(SCB->CCR & SCB_CCR_DC_Msk)) {
+			SCB_EnableDCache();
+		}
 	}
 
 	/* Install default handler that simply resets the CPU

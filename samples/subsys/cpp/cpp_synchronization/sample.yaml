@@ -3,8 +3,7 @@ sample:
 tests:
   sample.cpp.synchronization:
     tags: cpp
-    toolchain_exclude: issm
-    arch_exclude: posix
+    toolchain_exclude: issm xcc
     integration_platforms:
       - qemu_x86
     harness: console

@@ -27,6 +27,12 @@ osource "$(KCONFIG_BINARY_DIR)/Kconfig.soc.defconfig"
 osource "soc/$(ARCH)/*/Kconfig.defconfig"
 # This loads the toolchain defconfigs
 osource "$(TOOLCHAIN_KCONFIG_DIR)/Kconfig.defconfig"
+# This loads the testsuite defconfig
+source "subsys/testsuite/Kconfig.defconfig"
+
+# This should be early since the autogen Kconfig.dts symbols may get
+# used by modules
+source "dts/Kconfig"
 
 menu "Modules"
 
@@ -38,7 +44,6 @@ source "boards/Kconfig"
 source "soc/Kconfig"
 source "arch/Kconfig"
 source "kernel/Kconfig"
-source "dts/Kconfig"
 source "drivers/Kconfig"
 source "lib/Kconfig"
 source "subsys/Kconfig"
@@ -162,6 +167,13 @@ config CMAKE_LINKER_GENERATOR
 
 endchoice
 
+config LLVM_USE_LD
+	bool "LLVM use ld linker"
+	depends on "${ZEPHYR_TOOLCHAIN_VARIANT}" = "llvm"
+	default y
+	help
+	  Use binutils ld linker instead of LLVM built-in lld linker.
+
 config HAVE_CUSTOM_LINKER_SCRIPT
 	bool "Custom linker script provided"
 	help
@@ -221,7 +233,7 @@ config SRAM_OFFSET
 menu "Linker Sections"
 
 config LINKER_USE_BOOT_SECTION
-	bool "Enable Usage of Boot Linker Section"
+	bool "Use Boot Linker Section"
 	help
 	  If enabled, the symbols which are needed for the boot process
 	  will be put into another linker section reserved for these
@@ -231,7 +243,7 @@ config LINKER_USE_BOOT_SECTION
 	  board or custom linker script.
 
 config LINKER_USE_PINNED_SECTION
-	bool "Enable Usage of Pinned Linker Section"
+	bool "Use Pinned Linker Section"
 	help
 	  If enabled, the symbols which need to be pinned in memory
 	  will be put into another linker section reserved for pinned
@@ -253,6 +265,32 @@ config LINKER_GENERIC_SECTIONS_PRESENT_AT_BOOT
 	  memory at once.
 
 	  If unsure, say Y.
+
+config LINKER_LAST_SECTION_ID
+	bool "Last section identifier"
+	default y
+	depends on ARM || ARM64 || RISCV
+	help
+	  If enabled, the last section will contain an identifier.
+	  This ensures that the '_flash_used' linker symbol will always be
+	  correctly calculated, even in cases where the location counter may
+	  have been incremented for alignment purposes but no data is placed
+	  after alignment.
+
+	  Note: in cases where the flash is fully used, for example application
+	  specific data is written at the end of the flash area, then writing a
+	  last section identifier may cause rom region overflow.
+	  In such cases this setting should be disabled.
+
+config LINKER_LAST_SECTION_ID_PATTERN
+	hex "Last section identifier pattern"
+	default "0xE015E015"
+	depends on LINKER_LAST_SECTION_ID
+	help
+	  Pattern to fill into last section as identifier.
+	  Default pattern is 0xE015 (end of last section), but any pattern can
+	  be used.
+	  The size of the pattern must not exceed 4 bytes.
 
 endmenu # "Linker Sections"
 
@@ -309,10 +347,42 @@ config NO_OPTIMIZATIONS
 endchoice
 
 config COMPILER_COLOR_DIAGNOSTICS
-	bool "Enable colored diganostics"
+	bool "Colored diagnostics"
 	default y
 	help
 	  Compiler diagnostic messages are colorized.
+
+choice COMPILER_SECURITY_FORTIFY
+	prompt "Detect buffer overflows in libc calls"
+	default FORTIFY_SOURCE_NONE if NO_OPTIMIZATIONS || MINIMAL_LIBC || NATIVE_APPLICATION
+	default FORTIFY_SOURCE_COMPILE_TIME
+	help
+	  Buffer overflow checking in libc calls. Supported by Clang and
+	  GCC when using Picolibc or Newlib. Requires compiler optimization
+	  to be enabled.
+
+config FORTIFY_SOURCE_NONE
+	bool "No detection"
+	help
+	  Disables both compile-time and run-time checking.
+
+config FORTIFY_SOURCE_COMPILE_TIME
+	bool "Compile-time detection"
+	help
+	  Enables only compile-time checking. Compile-time checking
+	  doesn't increase executable size or reduce performance, it
+	  limits checking to what can be done with information available
+	  at compile time.
+
+config FORTIFY_SOURCE_RUN_TIME
+	bool "Compile-time and run-time detection"
+	help
+	  Enables both compile-time and run-time checking. Run-time
+	  checking increases coverage at the expense of additional code,
+	  and means that applications will raise a runtime exception
+	  when buffer overflow is detected.
+
+endchoice
 
 config COMPILER_OPT
 	string "Custom compiler options"
@@ -349,7 +419,7 @@ config NO_RUNTIME_CHECKS
 	  Do not do any runtime checks or asserts when using the CHECK macro.
 
 config RUNTIME_ERROR_CHECKS
-	bool "Enable runtime error checks"
+	bool "Runtime error checks"
 	help
 	  Always perform runtime checks covered with the CHECK macro. This
 	  option is the default and the only option used during testing.
@@ -369,6 +439,11 @@ config OUTPUT_STAT
 	default y
 	help
 	  Create a stat file using readelf -e <elf>
+
+config OUTPUT_SYMBOLS
+	bool "Create a symbol file"
+	help
+	  Create a symbol file using nm <elf>
 
 config OUTPUT_DISASSEMBLY
 	bool "Create a disassembly file"
@@ -459,9 +534,11 @@ if BUILD_OUTPUT_UF2
 config BUILD_OUTPUT_UF2_FAMILY_ID
 	string "UF2 device family ID"
 	default "0x1c5f21b0" if SOC_ESP32
+	default "0x621e937a" if SOC_NRF52833_QIAA
 	default "0xada52840" if SOC_NRF52840_QIAA
 	default "0x4fb2d5bd" if SOC_SERIES_IMX_RT
 	default "0x2abc77ec" if SOC_SERIES_LPC55XXX
+	default "0xe48bff56" if SOC_SERIES_RP2XXX
 	default "0x68ed2b88" if SOC_SERIES_SAMD21
 	default "0x55114460" if SOC_SERIES_SAMD51
 	default "0x647824b6" if SOC_SERIES_STM32F0X
@@ -486,6 +563,14 @@ config BUILD_OUTPUT_UF2_FAMILY_ID
 	  name string. If the SoC in use is known by UF2, the Family ID will
 	  be pre-filled with the known value.
 
+config BUILD_OUTPUT_UF2_USE_FLASH_BASE
+	bool
+	default n
+
+config BUILD_OUTPUT_UF2_USE_FLASH_OFFSET
+	bool
+	default n
+
 endif # BUILD_OUTPUT_UF2
 
 config BUILD_OUTPUT_STRIPPED
@@ -493,6 +578,41 @@ config BUILD_OUTPUT_STRIPPED
 	help
 	  Build a stripped binary zephyr/zephyr.strip in the build directory.
 	  The name of this file can be customized with CONFIG_KERNEL_BIN_NAME.
+
+config BUILD_OUTPUT_ADJUST_LMA
+	string
+	help
+	  This will adjust the LMA address in the final ELF and hex files with
+	  the value provided.
+	  This will not affect the internal address symbols inside the image but
+	  can be useful when adjusting the LMA address for flash tools or multi
+	  stage loaders where a pre-loader may copy image to a second location
+	  before booting a second core.
+	  The value will be evaluated as a math expression, this means that
+	  following are valid expression
+	  - 1024
+	  - 0x1000
+	  - -0x1000
+	  - 0x20000000 - 0x10000000
+	  Note: negative numbers are valid.
+	  To adjust according to a chosen flash partition one can specify a
+	  default as:
+	  DT_CHOSEN_IMAGE_<name> := <name>,<name>-partition
+	  DT_CHOSEN_Z_FLASH := zephyr,flash
+	  config BUILD_OUTPUT_ADJUST_LMA
+	    default "$(dt_chosen_reg_addr_hex,$(DT_CHOSEN_IMAGE_M4))-\
+	             $(dt_chosen_reg_addr_hex,$(DT_CHOSEN_Z_FLASH))"
+
+config BUILD_OUTPUT_INFO_HEADER
+	bool "Create a image information header"
+	help
+	  Create an image information header which will contain image
+	  information from the Zephyr binary.
+	  Example of information contained in the header file:
+	  - Number of segments in the image
+	  - LMA address of each segment
+	  - VMA address of each segment
+	  - Size of each segment
 
 config APPLICATION_DEFINED_SYSCALL
 	bool "Scan application folder for any syscall definition"
@@ -506,7 +626,56 @@ config MAKEFILE_EXPORTS
 	  Generates a file with build information that can be read by
 	  third party Makefile-based build systems.
 
+config BUILD_OUTPUT_META
+	bool "Create a build meta file"
+	help
+	  Create a build meta file in the build directory containing lists of:
+	  - Zephyr: path and revision (if git repo)
+	  - Zephyr modules: name, path, and revision (if git repo)
+	  - West:
+	    - manifest: path and revision
+	    - projects: path and revision
+	  - Workspace:
+	    - dirty: one or more repositories are marked dirty
+	    - extra: extra Zephyr modules are manually included in the build
+	    - off:   the SHA of one or more west projects are not what the manifest
+	             defined when `west update` was run the last time (`manifest-rev`).
+	             The off state is only present if a west workspace is found.
+	  File extension is .meta
+
+config BUILD_OUTPUT_META_STATE_PROPAGATE
+	bool "Propagate module and project state"
+	depends on BUILD_OUTPUT_META
+	help
+	  Propagate to state of each module to the Zephyr revision field.
+	  If west is used the state of each west project is also propagated to
+	  the Zephyr revision field.
+	  West manifest repo revision field will also
+	  be marked with the same state as the Zephyr revision.
+	  The final revision will become: <SHA>-<state1>-<state2>-<state3>...
+	  If no states are appended to the SHA it means the build is of a clean
+	  tree.
+	  - dirty: one or more repositories are marked dirty
+	  - extra: extra Zephyr modules are manually included in the build
+	  - off:   the SHA of one or more west projects are not what the manifest
+	           defined when `west update` was run the last time (`manifest-rev`).
+	           The off state is only present if a west workspace is found.
+
 endmenu
+
+config DEPRECATED
+	bool
+	help
+	  Symbol that must be selected by a feature or module if it is
+	  considered to be deprecated.
+
+config WARN_DEPRECATED
+	bool
+	default y
+	prompt "Warn on deprecated usage"
+	help
+	  Print a warning when the Kconfig tree is parsed if any deprecated
+	  features are enabled.
 
 config EXPERIMENTAL
 	bool
@@ -520,6 +689,28 @@ config WARN_EXPERIMENTAL
 	help
 	  Print a warning when the Kconfig tree is parsed if any experimental
 	  features are enabled.
+
+config TAINT
+	bool
+	help
+	  Symbol that must be selected by a feature or module if the Zephyr
+	  build is considered tainted.
+
+config ENFORCE_ZEPHYR_STDINT
+	bool
+	prompt "Enforce Zephyr convention for stdint"
+	depends on !ARCH_POSIX
+	default y
+	help
+	  This enforces the Zephyr stdint convention where int32_t = int,
+	  int64_t = long long, and intptr_t = long so that short string
+	  format length modifiers can be used universally across ILP32
+	  and LP64 architectures. Sometimes this is not possible e.g. when
+	  linking against a binary-only C++ library whose type mangling
+	  is incompatible with the Zephyr convention, or if the build
+	  environment doesn't allow such enforcement, in which case this
+	  should be turned off with the caveat that argument type validation
+	  on Zephyr code will be skipped.
 
 endmenu
 
@@ -579,6 +770,7 @@ if BOOTLOADER_MCUBOOT
 config MCUBOOT_SIGNATURE_KEY_FILE
 	string "Path to the mcuboot signing key file"
 	default ""
+	depends on !MCUBOOT_GENERATE_UNSIGNED_IMAGE
 	help
 	  The file contains a key pair whose public half is verified
 	  by your target's MCUboot image. The file is in PEM format.
@@ -637,6 +829,13 @@ config MCUBOOT_EXTRA_IMGTOOL_ARGS
 	  you can use this option to pass extra options to imgtool.
 	  For example, you could set this to "--version 1.2".
 
+config MCUBOOT_GENERATE_UNSIGNED_IMAGE
+	bool "Generate unsigned binary image bootable with MCUboot"
+	help
+	  Enabling this configuration allows automatic unsigned binary image
+	  generation when MCUboot signing key is not provided,
+	  i.e., MCUBOOT_SIGNATURE_KEY_FILE is left empty.
+
 config MCUBOOT_GENERATE_CONFIRMED_IMAGE
 	bool "Also generate a padded, confirmed image"
 	help
@@ -652,7 +851,8 @@ endif # BOOTLOADER_MCUBOOT
 
 config BOOTLOADER_ESP_IDF
 	bool "ESP-IDF bootloader support"
-	depends on SOC_ESP32 || SOC_ESP32S2
+	depends on (SOC_ESP32 || SOC_ESP32S2 || SOC_ESP32C3) && !BOOTLOADER_MCUBOOT
+	default y
 	help
 	  This option will trigger the compilation of the ESP-IDF bootloader
 	  inside the build folder.
@@ -711,3 +911,14 @@ config COMPAT_INCLUDES
 	  deprecated header files.
 
 endmenu
+
+config LEGACY_INCLUDE_PATH
+	bool "Allow for the legacy include paths (without the zephyr/ prefix) (DEPRECATED)"
+	select DEPRECATED
+	help
+	  DEPRECATED: Allow applications and libraries to use the Zephyr legacy
+	  include path which does not use the zephyr/ prefix. For example, the
+	  preferred way to include a Zephyr header is to use <zephyr/kernel.h>,
+	  but enabling CONFIG_LEGACY_INCLUDE_PATH will allow developers to use
+	  <kernel.h> instead. This (without the zephyr/ prefix) is deprecated
+	  and should be avoided. Eventually, it will not be supported.

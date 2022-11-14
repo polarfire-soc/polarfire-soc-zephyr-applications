@@ -31,9 +31,7 @@ board:
 - USB OTG full speed or device only
 
 .. image:: img/nucleo_l552ze_q.jpg
-   :width: 250px
    :align: center
-   :height: 250px
    :alt: Nucleo L552ZE Q
 
 More information about the board can be found at the `Nucleo L552ZE Q website`_.
@@ -163,6 +161,8 @@ hardware features:
 | UART      | on-chip    | serial port-polling;                |
 |           |            | serial port-interrupt               |
 +-----------+------------+-------------------------------------+
+| die-temp  | on-chip    | die temperature sensor              |
++-----------+------------+-------------------------------------+
 
 The default configuration can be found in the defconfig and dts files:
 
@@ -180,6 +180,44 @@ The default configuration can be found in the defconfig and dts files:
   - :zephyr_file:`boards/arm/nucleo_l552ze_q/nucleo_l552ze_q_ns_defconfig`
   - :zephyr_file:`boards/arm/nucleo_l552ze_q/nucleo_l552ze_q_ns.dts`
 
+Zephyr board options
+====================
+
+The STM32L552e is an SoC with Cortex-M33 architecture. Zephyr provides support
+for building for both Secure and Non-Secure firmware.
+
+The BOARD options are summarized below:
+
++----------------------+-----------------------------------------------+
+|   BOARD              | Description                                   |
++======================+===============================================+
+| nucleo_l552ze_q      | For building Secure (or Secure-only) firmware |
++----------------------+-----------------------------------------------+
+| nucleo_l552ze_q_ns   | For building Non-Secure firmware              |
++----------------------+-----------------------------------------------+
+
+Here are the instructions to build Zephyr with a non-secure configuration,
+using `tfm_ipc_` sample:
+
+   .. code-block:: bash
+
+      $ west build -b nucleo_l552ze_q_ns samples/tfm_integration/tfm_ipc/
+
+Once done, before flashing, you need to first run a generated script that
+will set platform option bytes config and erase platform (among others,
+option bit TZEN will be set).
+
+   .. code-block:: bash
+
+      $ ./build/tfm/regression.sh
+      $ west flash
+
+Please note that, after having run a TFM sample on the board, you will need to
+run `./build/tfm/regression.sh` once more to clean up the board from secure
+options and get back the platform back to a "normal" state and be able to run
+usual, non-TFM, binaries.
+Also note that, even then, TZEN will remain set, and you will need to use
+STM32CubeProgrammer_ to disable it fully, if required.
 
 Connections and IOs
 ===================
@@ -189,15 +227,11 @@ input/output, pull-up, etc.
 
 Available pins:
 ---------------
-.. image:: img/nucleo_l552ze_q_zio_left_2020_2_11.png
-   :width: 720px
+.. image:: img/nucleo_l552ze_q_zio_left_2020_2_11.jpg
    :align: center
-   :height: 540px
    :alt: Nucleo L552ZE Q Zio left connector
-.. image:: img/nucleo_l552ze_q_zio_right_2020_2_11.png
-   :width: 720px
+.. image:: img/nucleo_l552ze_q_zio_right_2020_2_11.jpg
    :align: center
-   :height: 540px
    :alt: Nucleo L552ZE Q Zio right connector
 
 For mode details please refer to `STM32 Nucleo-144 board User Manual`_.
@@ -317,7 +351,7 @@ Finally, to flash the board, run:
 
 .. code-block:: bash
 
-   $ west flash --hex-file build/tfm_merged.hex
+   $ west flash
 
 Note: Check the ``build/tfm`` directory to ensure that the commands required by these scripts
 (``readlink``, etc.) are available on your system. Please also check ``STM32_Programmer_CLI``
@@ -346,3 +380,6 @@ You can debug an application in the usual way.  Here is an example for the
 
 .. _STM32L552 reference manual:
    http://www.st.com/resource/en/reference_manual/DM00346336.pdf
+
+.. _STM32CubeProgrammer:
+   https://www.st.com/en/development-tools/stm32cubeprog.html

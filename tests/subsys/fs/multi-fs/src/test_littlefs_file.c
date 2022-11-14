@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <fs/fs.h>
+#include <zephyr/fs/fs.h>
 #include "test_common.h"
 #include "test_littlefs.h"
 #include "test_littlefs_priv.h"
@@ -28,14 +28,14 @@ void test_littlefs_write(void)
 
 void test_littlefs_read(void)
 {
-	zassert_true(test_file_read(&test_file, test_str) == TC_PASS, NULL);
+	zassert_true(test_file_read(&test_file, test_str) == TC_PASS);
 }
 
 void test_littlefs_close(void)
 {
-	zassert_true(test_file_close(&test_file) == TC_PASS, NULL);
+	zassert_true(test_file_close(&test_file) == TC_PASS);
 }
 void test_littlefs_unlink(void)
 {
-	zassert_true(test_file_delete(TEST_FILE_PATH) == TC_PASS, NULL);
+	zassert_true(test_file_delete(TEST_FILE_PATH) == TC_PASS);
 }

@@ -12,23 +12,24 @@
 #include <soc/system_reg.h>
 #include <soc/cache_memory.h>
 #include "hal/soc_ll.h"
+#include "esp_cpu.h"
+#include "esp_timer.h"
 #include "esp_spi_flash.h"
 #include <soc/interrupt_reg.h>
-#include <drivers/interrupt_controller/intc_esp32c3.h>
+#include <zephyr/drivers/interrupt_controller/intc_esp32c3.h>
 
-#include <kernel_structs.h>
+#include <zephyr/kernel_structs.h>
+#include <kernel_internal.h>
 #include <string.h>
-#include <toolchain/gcc.h>
+#include <zephyr/toolchain/gcc.h>
 #include <soc.h>
-
-extern void _PrepC(void);
 
 /*
  * This is written in C rather than assembly since, during the port bring up,
  * Zephyr is being booted by the Espressif bootloader.  With it, the C stack
  * is already set up.
  */
-void __attribute__((section(".iram1"))) __start(void)
+void __attribute__((section(".iram1"))) __esp_platform_start(void)
 {
 	volatile uint32_t *wdt_rtc_protect = (uint32_t *)RTC_CNTL_WDTWPROTECT_REG;
 	volatile uint32_t *wdt_rtc_reg = (uint32_t *)RTC_CNTL_WDTCONFIG0_REG;
@@ -47,27 +48,11 @@ void __attribute__((section(".iram1"))) __start(void)
 	__asm__ __volatile__("la t0, _esp32c3_vector_table\n"
 						"csrw mtvec, t0\n");
 
+	z_bss_zero();
+
 	/* Disable normal interrupts. */
 	csr_read_clear(mstatus, MSTATUS_MIE);
 
-#if !CONFIG_BOOTLOADER_ESP_IDF
-	/* The watchdog timer is enabled in the 1st stage (ROM) bootloader.
-	 * We're done booting, so disable it.
-	 * If 2nd stage bootloader from IDF is enabled, then that will take
-	 * care of this.
-	 */
-	volatile uint32_t *wdt_timg_protect = (uint32_t *)TIMG_WDTWPROTECT_REG(0);
-	volatile uint32_t *wdt_timg_reg = (uint32_t *)TIMG_WDTCONFIG0_REG(0);
-
-	*wdt_rtc_protect = RTC_CNTL_WDT_WKEY_VALUE;
-	*wdt_rtc_reg &= ~RTC_CNTL_WDT_FLASHBOOT_MOD_EN;
-	*wdt_rtc_protect = 0;
-	*wdt_timg_protect = TIMG_WDT_WKEY_VALUE;
-	*wdt_timg_reg &= ~TIMG_WDT_FLASHBOOT_MOD_EN;
-	*wdt_timg_protect = 0;
-#endif
-
-#if CONFIG_BOOTLOADER_ESP_IDF
 	/* ESP-IDF 2nd stage bootloader enables RTC WDT to check on startup sequence
 	 * related issues in application. Hence disable that as we are about to start
 	 * Zephyr environment.
@@ -75,7 +60,6 @@ void __attribute__((section(".iram1"))) __start(void)
 	*wdt_rtc_protect = RTC_CNTL_WDT_WKEY_VALUE;
 	*wdt_rtc_reg &= ~RTC_CNTL_WDT_EN;
 	*wdt_rtc_protect = 0;
-#endif
 
 	/* Configure the Cache MMU size for instruction and rodata in flash. */
 	extern uint32_t esp_rom_cache_set_idrom_mmu_size(uint32_t irom_size,
@@ -97,11 +81,17 @@ void __attribute__((section(".iram1"))) __start(void)
 	REG_CLR_BIT(SYSTEM_WIFI_CLK_EN_REG, SYSTEM_WIFI_CLK_SDIOSLAVE_EN);
 	SET_PERI_REG_MASK(SYSTEM_WIFI_CLK_EN_REG, SYSTEM_WIFI_CLK_EN);
 
+	esp_timer_early_init();
+
+#if CONFIG_SOC_FLASH_ESP32
+	spi_flash_guard_set(&g_flash_guard_default_ops);
+#endif
+
 	/*Initialize the esp32c3 interrupt controller */
 	esp_intr_initialize();
 
 	/* Start Zephyr */
-	_PrepC();
+	z_cstart();
 
 	CODE_UNREACHABLE;
 }
@@ -124,7 +114,6 @@ void IRAM_ATTR esp_restart_noos(void)
 	/* Flush any data left in UART FIFOs */
 	esp_rom_uart_tx_wait_idle(0);
 	esp_rom_uart_tx_wait_idle(1);
-	esp_rom_uart_tx_wait_idle(2);
 
 	/* 2nd stage bootloader reconfigures SPI flash signals. */
 	/* Reset them to the defaults expected by ROM */
@@ -143,6 +132,9 @@ void IRAM_ATTR esp_restart_noos(void)
 			BLE_REG_REST_BIT | BLE_PWR_REG_REST_BIT | BLE_BB_REG_REST_BIT);
 
 	REG_WRITE(SYSTEM_CORE_RST_EN_REG, 0);
+
+	/* Reset uart0 core first, then reset apb side. */
+	SET_PERI_REG_MASK(UART_CLK_CONF_REG(0), UART_RST_CORE_M);
 
 	/* Reset timer/spi/uart */
 	SET_PERI_REG_MASK(SYSTEM_PERIP_RST_EN0_REG,

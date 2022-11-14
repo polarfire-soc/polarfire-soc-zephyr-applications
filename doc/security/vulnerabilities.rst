@@ -345,7 +345,7 @@ UpdateHub Might Dereference An Uninitialized Pointer
 In updatehub_probe, right after JSON parsing is complete, objects\[1]
 is accessed from the output structure in two different places. If the
 JSON contained less than two elements, this access would reference
-unitialized stack memory. This could result in a crash, denial of
+uninitialized stack memory. This could result in a crash, denial of
 service, or possibly an information leak.
 
 Recommend disabling updatehub until such a time as a fix can be made
@@ -832,12 +832,15 @@ CVE-2021-3323
 
 Integer Underflow in 6LoWPAN IPHC Header Uncompression
 
+This has been fixed in main for v2.5.0
+
 - `CVE-2020-3323 <http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-3323>`_
 
-- `Zephyr project bug tracker ZEPSEC-116
-  <https://zephyrprojectsec.atlassian.net/browse/ZEPSEC-116>`_
+- `Zephyr project bug tracker GHSA-89j6-qpxf-pfpc
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-89j6-qpxf-pfpc>`_
 
-- This issue has not been fixed.
+- `PR 31971 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/31971>`_
 
 CVE-2021-3430
 -------------
@@ -1104,3 +1107,138 @@ This has been fixed in main for v2.6.0
 
 - `PR 36694 fix for main
   <https://github.com/zephyrproject-rtos/zephyr/pull/36694>`_
+
+CVE-2021-3835
+-------------
+
+Buffer overflow in Zephyr USB device class
+
+This has been fixed in main for v3.0.0
+
+- `CVE-2021-3835 <http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-3835>`_
+
+- `Zephyr project bug tracker GHSA-fm6v-8625-99jf
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-fm6v-8625-99jf>`_
+
+- `PR 42093 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/42093>`_
+
+- `PR 42167 fix for 2.7
+  <https://github.com/zephyrproject-rtos/zephyr/pull/42167>`_
+
+CVE-2021-3861
+-------------
+
+Buffer overflow in the RNDIS USB device class
+
+This has been fixed in main for v3.0.0
+
+- `CVE-2021-3861 <http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-3861>`_
+
+- `Zephyr project bug tracker GHSA-hvfp-w4h8-gxvj
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-hvfp-w4h8-gxvj>`_
+
+- `PR 39725 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/39725>`_
+
+CVE-2021-3966
+-------------
+
+Usb bluetooth device ACL read cb buffer overflow
+
+This has been fixed in main for v3.0.0
+
+- `Zephyr project bug tracker GHSA-hfxq-3w6x-fv2m
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-hfxq-3w6x-fv2m>`_
+
+- `PR 42093 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/42093>`_
+
+- `PR 42167 fix for v2.7.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/42167>`_
+
+CVE-2022-0553
+-------------
+
+Possible to retrieve unencrypted firmware image
+
+This has been fixed in main for v3.0.0
+
+- `Zephyr project bug tracker GHSA-wrj2-9vj9-rrcp
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-wrj2-9vj9-rrcp>`_
+
+- `PR 42424 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/42424>`_
+
+CVE-2022-1041
+--------------
+
+Out-of-bound write vulnerability in the Bluetooth mesh core stack can be triggered during provisioning
+
+This has been fixed in main for v3.1.0
+
+- `Zephyr project bug tracker GHSA-p449-9hv9-pj38
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-p449-9hv9-pj38>`_
+
+- `PR 45136 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/45136>`_
+
+- `PR 45188 fix for v3.0.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/45188>`_
+
+- `PR 45187 fix for v2.7.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/45187>`_
+
+CVE-2022-1042
+--------------
+
+Out-of-bound write vulnerability in the Bluetooth mesh core stack can be triggered during provisioning
+
+This has been fixed in main for v3.1.0
+
+- `Zephyr project bug tracker GHSA-j7v7-w73r-mm5x
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-j7v7-w73r-mm5x>`_
+
+- `PR 45066 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/45066>`_
+
+- `PR 45135 fix for v3.0.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/45135>`_
+
+- `PR 45134 fix for v2.7.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/45134>`_
+
+CVE-2022-1841
+--------------
+
+Out-of-Bound Write in tcp_flags
+
+This has been fixed in main for v3.1.0
+
+- `Zephyr project bug tracker GHSA-5c3j-p8cr-2pgh
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-5c3j-p8cr-2pgh>`_
+
+- `PR 45796 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/45796>`_
+
+CVE-2022-2741
+--------------
+
+can: denial-of-service can be triggered by a crafted CAN frame
+
+This has been fixed in main for v3.2.0
+
+- `Zephyr project bug tracker GHSA-hx5v-j59q-c3j8
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-hx5v-j59q-c3j8>`_
+
+- `PR 47903 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/47903>`_
+
+- `PR 47957 fix for v3.1.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/47957>`_
+
+- `PR 47958 fix for v3.0.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/47958>`_
+
+- `PR 47959 fix for v2.7.0
+  <https://github.com/zephyrproject-rtos/zephyr/pull/47959>`_

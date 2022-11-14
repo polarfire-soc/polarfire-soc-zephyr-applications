@@ -1,3 +1,5 @@
+.. _zephyr-audio-dsp-development-on-chromebooks:
+
 Zephyr Audio DSP Development on Chromebooks
 ###########################################
 
@@ -93,7 +95,7 @@ Next you disable the validation step:
 
 **THIS COMMAND WILL FAIL**, give you an error that you are changing
 the setting for the entire running system, and suggest an alternative
-"--paritions X" argument to use that modifies only the currently used
+"--partitions X" argument to use that modifies only the currently used
 partition.  Run that modified command, then reboot.
 
 After rebooting, you will notice that your chromebook boots with the
@@ -108,7 +110,7 @@ verity configuration in place though, it just doesn't try to mount the
 resulting (now-invalid!) partition.
 
 Metanote: The astute will note that we're probably going to throw this
-kernel out, and that we could probably have just editted the command
+kernel out, and that we could probably have just edited the command
 line of the new kernel instead of flashing and rebooting into this
 modified one.  But that's too many balls to juggle at once for me.
 
@@ -357,13 +359,19 @@ but anywhere is acceptable):
 Copy Integration Scripting to Chromebook
 ========================================
 
-There are two python scripts needed on the device, to be run inside
+There is a python scripts needed on the device, to be run inside
 the Crouton environment installed above.  Copy them:
 
 .. code-block:: console
 
-    dev$ scp boards/xtensa/intel_adsp_cavs15/tools/cavs-fw-v25.py root@crouton:
-    dev$ scp boards/xtensa/intel_adsp_cavs15/tools/adsplog.py root@crouton:
+    dev$ scp boards/xtensa/intel_adsp_cavs15/tools/cavstool.py user@crouton:
+
+Then start the service in the Crouton environment:
+
+.. code-block:: console
+
+    crouton$ sudo ./cavstool.py user@crouton:
+
 
 Build and Sign Zephyr App
 =========================
@@ -379,7 +387,6 @@ a "zephyr.ri" file to be copied to the device.
     dev$ west build -b intel_adsp_cavs25 samples/hello_world
     dev$ west sign --tool-data=~/rimage/config -t ~/rimage/rimage -- \
                 -k $ZEPHYR_BASE/../modules/audio/sof/keys/otc_private_key_3k.pem
-    dev$ scp build/zephyr/zephyr.ri root@crouton:
 
 Run it!
 =======
@@ -391,8 +398,7 @@ the logging script.
 
 .. code-block:: console
 
-    crouton# ./cavs-fw-v25.py zephyr.ri
-    crouton# ./adsplog.py
+    dev$ west flash --remote-host crouton
     Hello World! intel_adsp_cavs25
 
 Misc References

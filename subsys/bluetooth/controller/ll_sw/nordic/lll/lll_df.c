@@ -6,13 +6,15 @@
 
 #include <stdint.h>
 #include <soc.h>
-#include <bluetooth/hci.h>
+#include <zephyr/bluetooth/hci.h>
 
 #include "util/util.h"
 #include "util/memq.h"
 #include "util/mem.h"
+#include "util/dbuf.h"
 
 #include "hal/cpu.h"
+#include "hal/ccm.h"
 #include "hal/radio_df.h"
 
 #include "pdu.h"
@@ -21,8 +23,9 @@
 #include "lll_adv_types.h"
 #include "lll_adv.h"
 #include "lll_adv_pdu.h"
-#include "lll_df.h"
 #include "lll_df_types.h"
+#include "lll_sync.h"
+#include "lll_df.h"
 #include "lll_df_internal.h"
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_CTLR_DF_DEBUG_ENABLE)
@@ -31,10 +34,18 @@
 #include <soc.h>
 #include "hal/debug.h"
 
+/* Minimum number of antenna switch patterns required by Direction Finding Extension to be
+ * configured in SWTICHPATTER register. The value is set to 2, even though the radio peripheral
+ * specification requires 3.
+ * Radio always configures three antenna patterns. First pattern is set implicitly in
+ * radio_df_ant_switch_pattern_set. It is provided by DTS radio.dfe_pdu_antenna property.
+ * There is a need for two more patterns to be provided by an application.
+ * They are aimed for: reference period and switch-sample period.
+ */
+#define DF_MIN_ANT_NUM_REQUIRED 2
+
 static int init_reset(void);
-#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
-static void df_cte_tx_configure(const struct lll_df_adv_cfg *df_cfg);
-#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
+
 /* @brief Function performs Direction Finding initialization
  *
  * @return	Zero in case of success, other value in case of failure.
@@ -95,7 +106,8 @@ void lll_df_cte_tx_enable(struct lll_adv_sync *lll_sync, const struct pdu_adv *p
 			df_cfg = lll_adv_sync_extra_data_curr_get(lll_sync);
 			LL_ASSERT(df_cfg);
 
-			df_cte_tx_configure(df_cfg);
+			lll_df_cte_tx_configure(df_cfg->cte_type, df_cfg->cte_length,
+						df_cfg->ant_sw_len, df_cfg->ant_ids);
 
 			lll_sync->cte_started = 1U;
 			*cte_len_us = CTE_LEN_US(df_cfg->cte_length);
@@ -196,29 +208,34 @@ struct lll_df_sync_cfg *lll_df_sync_cfg_latest_get(struct lll_df_sync *df_cfg,
 
 	return &df_cfg->cfg[first];
 }
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
 
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX) || defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX)
 /* @brief Function initializes reception of Constant Tone Extension.
  *
  * @param slot_duration     Switching and sampling slots duration (1us or 2us).
  * @param ant_num           Number of antennas in switch pattern.
  * @param ant_ids           Antenna identifiers that create switch pattern.
  * @param chan_idx          Channel used to receive PDU with CTE
+ * @param cte_info_in_s1    Inform if CTEInfo is in S1 byte for conn. PDU or in extended advertising
+ *                          header of per. adv. PDU.
+ * @param phy               Current PHY
  *
  * In case of AoA mode ant_num and ant_ids parameters are not used.
  */
-void lll_df_conf_cte_rx_enable(uint8_t slot_duration, uint8_t ant_num, uint8_t *ant_ids,
-			       uint8_t chan_idx)
+int lll_df_conf_cte_rx_enable(uint8_t slot_duration, uint8_t ant_num, const uint8_t *ant_ids,
+			      uint8_t chan_idx, bool cte_info_in_s1, uint8_t phy)
 {
 	struct node_rx_iq_report *node_rx;
 
 	/* ToDo change to appropriate HCI constant */
 #if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_1US)
 	if (slot_duration == 0x1) {
-		radio_df_cte_rx_2us_switching();
+		radio_df_cte_rx_2us_switching(cte_info_in_s1, phy);
 	} else
 #endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_1US */
 	{
-		radio_df_cte_rx_4us_switching();
+		radio_df_cte_rx_4us_switching(cte_info_in_s1, phy);
 	}
 
 #if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_RX)
@@ -227,13 +244,116 @@ void lll_df_conf_cte_rx_enable(uint8_t slot_duration, uint8_t ant_num, uint8_t *
 	radio_df_ant_switch_pattern_set(ant_ids, ant_num);
 #endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_RX */
 
+	/* Could be moved up, if Radio setup is not needed if we are not going to report IQ data */
 	node_rx = ull_df_iq_report_alloc_peek(1);
-	LL_ASSERT(node_rx);
+	if (!node_rx) {
+		return -ENOMEM;
+	}
 
 	radio_df_iq_data_packet_set(node_rx->pdu, IQ_SAMPLE_TOTAL_CNT);
 	node_rx->chan_idx = chan_idx;
+
+	return 0;
 }
-#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX || CONFIG_BT_CTLR_DF_CONN_CTE_RX */
+
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
+/**
+ * @brief Function allocates additional IQ report node for Host notification about
+ * insufficient resources to sample all CTE in a periodic synchronization event.
+ *
+ * @param sync_lll Pointer to periodic synchronization object
+ *
+ * @return -ENOMEM in case there is no free node for IQ Data report
+ * @return -ENOBUFS in case there are no free nodes for report of insufficient resources as well as
+ * IQ data report
+ * @return zero in case of success
+ */
+int lll_df_iq_report_no_resources_prepare(struct lll_sync *sync_lll)
+{
+	struct node_rx_iq_report *cte_incomplete;
+	int err;
+
+	/* Allocate additional node for a sync context only once. This is an additional node to
+	 * report there is no more memory to store IQ data, hence some of CTEs are not going
+	 * to be sampled.
+	 */
+	if (!sync_lll->node_cte_incomplete && !sync_lll->is_cte_incomplete) {
+		/* Check if there are free nodes for:
+		 * - storage of IQ data collcted during a PDU reception
+		 * - Host notification about insufficient resources for IQ data
+		 */
+		cte_incomplete = ull_df_iq_report_alloc_peek(2);
+		if (!cte_incomplete) {
+			/* Check if there is a free node to report insufficient resources only.
+			 * There will be no IQ Data collection.
+			 */
+			cte_incomplete = ull_df_iq_report_alloc_peek(1);
+			if (!cte_incomplete) {
+				/* No free nodes at all */
+				return -ENOBUFS;
+			}
+
+			/* No memory for IQ data report */
+			err = -ENOMEM;
+		} else {
+			err = 0;
+		}
+
+		/* Do actual allocation and store the node for futher processing after a PDU
+		 * reception,
+		 */
+		ull_df_iq_report_alloc();
+
+		/* Store the node in lll_sync object. This is a place where the node may be stored
+		 * until processing afte reception of a PDU to report no IQ data or hand over
+		 * to aux objects for usage in ULL. If there is not enough memory for IQ data
+		 * there is no node to use for temporary storage as it is done for PDUs.
+		 */
+		sync_lll->node_cte_incomplete = cte_incomplete;
+
+		/* Reset the state every time the prepare is called. IQ report node may be unchanged
+		 * from former synchronization event.
+		 */
+		sync_lll->is_cte_incomplete = false;
+	} else {
+		err = 0;
+	}
+
+	return err;
+}
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX  */
+
+#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX)
+/**
+ * @brief Function initializes parsing of received PDU for CTEInfo.
+ *
+ * Parsing a PDU for CTEInfo is required to successfully receive a PDU that may include CTE.
+ * It makes possible to correctly interpret PDU content by Radio peripheral.
+ */
+void lll_df_conf_cte_info_parsing_enable(void)
+{
+	/* Use of mandatory 2 us switching and sampling slots for CTEInfo parsing.
+	 * The configuration here does not matter for actual IQ sampling.
+	 * The collected data will not be reported to host.
+	 * Also sampling offset does not matter so, provided PHY is legacy to setup
+	 * the offset to default zero value.
+	 */
+	radio_df_cte_rx_4us_switching(true, PHY_LEGACY);
+
+#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_RX)
+	/* Use PDU_ANTENNA so no actual antenna change will be done. */
+	static uint8_t ant_ids[DF_MIN_ANT_NUM_REQUIRED] = { PDU_ANTENNA, PDU_ANTENNA };
+
+	radio_df_ant_switching_pin_sel_cfg();
+	radio_df_ant_switch_pattern_clear();
+	radio_df_ant_switch_pattern_set(ant_ids, DF_MIN_ANT_NUM_REQUIRED);
+#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_RX */
+
+	/* Do not set storage for IQ samples, it is irrelevant for parsing of a PDU for CTEInfo. */
+	radio_df_iq_data_packet_set(NULL, 0);
+}
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RX */
 
 /* @brief Function performs common steps for initialization and reset
  * of Direction Finding LLL module.
@@ -245,37 +365,38 @@ static int init_reset(void)
 	return 0;
 }
 
-#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
-/* @brief Function initializes transmission of Constant Tone Extension.
+#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX) || defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
+/**
+ * @brief Function configures transmission of Constant Tone Extension.
  *
- * @param df_cfg    Pointer to direction finding configuration
+ * @param cte_type    Type of the CTE
+ * @param cte_length  Length of CTE in units of 8 us
+ * @param num_ant_ids Length of @p ant_ids
+ * @param ant_ids     Pointer to antenna identifiers array
  *
- * @Note Pay attention that first two antenna identifiers in a switch
- * pattern df_cfg->ant_ids has special purpose. First one is used in guard period,
- * second in reference period. Actual switching is processed from third antenna.
- *
- * In case of AoA mode df_ant_sw_len and df->ant_ids members are not used.
+ * In case of AoA mode ant_sw_len and ant_ids members are not used.
  */
-static void df_cte_tx_configure(const struct lll_df_adv_cfg *df_cfg)
+void lll_df_cte_tx_configure(uint8_t cte_type, uint8_t cte_length, uint8_t num_ant_ids,
+			     const uint8_t *ant_ids)
 {
-	if (df_cfg->cte_type == BT_HCI_LE_AOA_CTE) {
+	if (cte_type == BT_HCI_LE_AOA_CTE) {
 		radio_df_mode_set_aoa();
-		radio_df_cte_tx_aoa_set(df_cfg->cte_length);
+		radio_df_cte_tx_aoa_set(cte_length);
 	}
 #if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_TX)
 	else {
 		radio_df_mode_set_aod();
 
-		if (df_cfg->cte_type == BT_HCI_LE_AOD_CTE_1US) {
-			radio_df_cte_tx_aod_2us_set(df_cfg->cte_length);
+		if (cte_type == BT_HCI_LE_AOD_CTE_1US) {
+			radio_df_cte_tx_aod_2us_set(cte_length);
 		} else {
-			radio_df_cte_tx_aod_4us_set(df_cfg->cte_length);
+			radio_df_cte_tx_aod_4us_set(cte_length);
 		}
 
 		radio_df_ant_switching_pin_sel_cfg();
 		radio_df_ant_switch_pattern_clear();
-		radio_df_ant_switch_pattern_set(df_cfg->ant_ids, df_cfg->ant_sw_len);
+		radio_df_ant_switch_pattern_set(ant_ids, num_ant_ids);
 	}
 #endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_TX */
 }
-#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
+#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX || CONFIG_BT_CTLR_DF_CONN_CTE_TX */

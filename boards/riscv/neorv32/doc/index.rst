@@ -10,13 +10,6 @@ The NEORV32 is an open-source RISC-V compatible processor system intended as a
 ready-to-go auxiliary processor within larger SoC designs or as a stand-alone
 customizable microcontroller.
 
-.. figure:: ./neorv32_logo_transparent.png
-   :width: 813px
-   :align: center
-   :alt: NEORV32
-
-   NEORV32 (Credit: Stephan Nolting)
-
 For more information about the NEORV32, see the following websites:
 
 - `The NEORV32 RISC-V Processor GitHub`_
@@ -44,6 +37,8 @@ Processor (SoC):
 +-----------+------------+-------------------------------------+
 | UART      | on-chip    | serial port-polling;                |
 |           |            | serial port-interrupt               |
++-----------+------------+-------------------------------------+
+| TRNG      | on-chip    | entropy                             |
 +-----------+------------+-------------------------------------+
 
 The default board configuration for the NEORV32 Processor (SoC) can be found in
@@ -93,6 +88,14 @@ system console.
    standard NEORV32 bootloader. The baudrate can be changed by modifying the
    ``current-speed`` property of the ``uart0`` devicetree node.
 
+True Random-Number Generator
+============================
+
+The True Random-Number Generator (TRNG) of the NEORV32 is supported, but
+disabled by default. For NEORV32 SoC implementations supporting the TRNG,
+support can be enabled by setting the ``status`` property of the ``trng``
+devicetree node to ``okay``.
+
 Programming and Debugging
 *************************
 
@@ -130,6 +133,17 @@ implementation with the On-Chip Debugger (OCD) and bootloader enabled.
    :board: neorv32
    :goals: flash
 
+The default board configuration uses an :ref:`openocd-debug-host-tools`
+configuration similar to the example provided by the NEORV32 project. Other
+JTAGs can be used by providing further arguments when building. Here is an
+example for using the Flyswatter JTAG:
+
+.. zephyr-app-commands::
+   :zephyr-app: samples/hello_world
+   :board: neorv32
+   :goals: flash
+   :gen-args: -DBOARD_RUNNER_ARGS_openocd="--config;interface/ftdi/flyswatter.cfg;--config;neorv32.cfg;--cmd-pre-init;'adapter speed 2000'"
+
 After flashing, you should see message similar to the following in the terminal:
 
 .. code-block:: console
@@ -143,15 +157,25 @@ revert to the application stored in the block RAM within the FPGA bitstream
 the next time the FPGA is configured.
 
 The steps to persist the application within the FPGA bitstream are covered by
-the NEORV32 user guide. If the :kconfig:`CONFIG_BUILD_OUTPUT_BIN` is enabled and
+the NEORV32 user guide. If the :kconfig:option:`CONFIG_BUILD_OUTPUT_BIN` is enabled and
 the NEORV32 ``image_gen`` binary is available, the build system will
 automatically generate a :file:`zephyr.vhd` file suitable for initialising the
 internal instruction memory of the NEORV32.
 
+In order for the build system to automatically detect the ``image_gen`` binary
+it needs to be in the :envvar:`PATH` environment variable. If not, the path
+can be passed at build time:
+
+.. zephyr-app-commands::
+   :zephyr-app: samples/hello_world
+   :board: neorv32
+   :goals: build
+   :gen-args: -DCMAKE_PROGRAM_PATH=<path/to/neorv32/sw/image_gen/>
+
 Uploading via UART
 ==================
 
-If the :kconfig:`CONFIG_BUILD_OUTPUT_BIN` is enabled and the NEORV32
+If the :kconfig:option:`CONFIG_BUILD_OUTPUT_BIN` is enabled and the NEORV32
 ``image_gen`` binary is available, the build system will automatically generate
 a :file:`zephyr_exe.bin` file suitable for uploading to the NEORV32 via the
 built-in bootloader as described in the NEORV32 user guide.

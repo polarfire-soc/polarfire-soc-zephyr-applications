@@ -16,11 +16,11 @@
 #define _SOC__H_
 
 #ifndef _ASMLANGUAGE
-#include <sys/util.h>
+#include <zephyr/sys/util.h>
 #include <fsl_common.h>
 
 /* Add include for DTS generated information */
-#include <devicetree.h>
+#include <zephyr/devicetree.h>
 
 #endif /* !_ASMLANGUAGE */
 
@@ -75,16 +75,22 @@
 /*!<@brief Slow mode */
 #define IOPCTL_PIO_SLEW_RATE_SLOW 0x80u
 
+/* Workaround to handle macro variation in the SDK */
+#ifndef INPUTMUX_PINTSEL_COUNT
+#define INPUTMUX_PINTSEL_COUNT INPUTMUX_PINT_SEL_COUNT
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if CONFIG_DISK_DRIVER_SDMMC &&					\
-	(DT_NODE_HAS_STATUS(DT_NODELABEL(usdhc1), okay) ||	\
-	 DT_NODE_HAS_STATUS(DT_NODELABEL(usdhc2), okay))
+#if CONFIG_IMX_USDHC &&					\
+	(DT_NODE_HAS_STATUS(DT_NODELABEL(usdhc0), okay) ||	\
+	 DT_NODE_HAS_STATUS(DT_NODELABEL(usdhc1), okay))
 
 void imxrt_usdhc_pinmux(uint16_t nusdhc,
 	bool init, uint32_t speed, uint32_t strength);
+void imxrt_usdhc_dat3_pull(bool pullup);
 
 #endif
 

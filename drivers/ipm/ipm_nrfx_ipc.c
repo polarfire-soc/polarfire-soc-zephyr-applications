@@ -7,12 +7,13 @@
 #define DT_DRV_COMPAT nordic_nrf_ipc
 
 #include <string.h>
-#include <drivers/ipm.h>
+#include <zephyr/drivers/ipm.h>
 #include <nrfx_ipc.h>
 #include "ipm_nrfx_ipc.h"
 
 #define LOG_LEVEL CONFIG_IPM_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 LOG_MODULE_REGISTER(ipm_nrfx_ipc);
 
 struct ipm_nrf_data {
@@ -27,20 +28,15 @@ static void gipm_send(uint32_t id);
 
 #if IS_ENABLED(CONFIG_IPM_NRF_SINGLE_INSTANCE)
 
-static void nrfx_ipc_handler(uint32_t event_mask, void *p_context)
+static void nrfx_ipc_handler(uint8_t event_idx, void *p_context)
 {
 	if (nrfx_ipm_data.callback) {
-		while (event_mask) {
-			uint8_t event_idx = __CLZ(__RBIT(event_mask));
-
-			__ASSERT(event_idx < NRFX_IPC_ID_MAX_VALUE,
-				 "Illegal event_idx: %d", event_idx);
-			event_mask &= ~BIT(event_idx);
-			nrfx_ipm_data.callback(DEVICE_DT_INST_GET(0),
-					       nrfx_ipm_data.user_data,
-					       event_idx,
-					       NULL);
-		}
+		__ASSERT(event_idx < NRFX_IPC_ID_MAX_VALUE,
+			 "Illegal event_idx: %d", event_idx);
+		nrfx_ipm_data.callback(DEVICE_DT_INST_GET(0),
+				       nrfx_ipm_data.user_data,
+				       event_idx,
+				       NULL);
 	}
 }
 
@@ -123,21 +119,16 @@ struct vipm_nrf_data {
 
 static struct vipm_nrf_data nrfx_vipm_data;
 
-static void vipm_dispatcher(uint32_t event_mask, void *p_context)
+static void vipm_dispatcher(uint8_t event_idx, void *p_context)
 {
-	while (event_mask) {
-		uint8_t event_idx = __CLZ(__RBIT(event_mask));
-
-		__ASSERT(event_idx < NRFX_IPC_ID_MAX_VALUE,
-			 "Illegal event_idx: %d", event_idx);
-		event_mask &= ~BIT(event_idx);
-		if (nrfx_vipm_data.callback[event_idx] != NULL) {
-			nrfx_vipm_data.callback[event_idx]
-				(nrfx_vipm_data.ipm_device[event_idx],
-				 nrfx_vipm_data.user_data[event_idx],
-				 0,
-				 NULL);
-		}
+	__ASSERT(event_idx < NRFX_IPC_ID_MAX_VALUE,
+		 "Illegal event_idx: %d", event_idx);
+	if (nrfx_vipm_data.callback[event_idx] != NULL) {
+		nrfx_vipm_data.callback[event_idx]
+			(nrfx_vipm_data.ipm_device[event_idx],
+			 nrfx_vipm_data.user_data[event_idx],
+			 0,
+			 NULL);
 	}
 }
 
@@ -231,9 +222,9 @@ DEVICE_DEFINE(vipm_nrf_##_idx, "IPM_"#_idx,				\
 		    &vipm_nrf_##_idx##_driver_api)
 
 #define VIPM_DEVICE(_idx, _)						\
-	IF_ENABLED(CONFIG_IPM_MSG_CH_##_idx##_ENABLE, (VIPM_DEVICE_1(_idx);))
+	IF_ENABLED(CONFIG_IPM_MSG_CH_##_idx##_ENABLE, (VIPM_DEVICE_1(_idx)))
 
-UTIL_LISTIFY(NRFX_IPC_ID_MAX_VALUE, VIPM_DEVICE, _);
+LISTIFY(NRFX_IPC_ID_MAX_VALUE, VIPM_DEVICE, (;), _);
 
 #endif
 

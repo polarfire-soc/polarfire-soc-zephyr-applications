@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-# The Zephyr build from this defconfig is execpted to boot from
+# The Zephyr build from this defconfig is expected to boot from
 # Intel Arm Trusted Firmware (ATF)
 # Boot Flow: BL21 -> BL31 -> Zephyr
 
@@ -12,7 +12,6 @@ CONFIG_ARM_ARCH_TIMER=y
 
 # Serial Drivers
 CONFIG_SERIAL=y
-CONFIG_UART_NS16550=y
 CONFIG_UART_INTERRUPT_DRIVEN=y
 CONFIG_UART_NS16550_ACCESS_WORD_ONLY=y
 

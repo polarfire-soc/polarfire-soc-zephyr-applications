@@ -4,19 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_test, CONFIG_NET_SOCKETS_LOG_LEVEL);
 
 #include <stdio.h>
-#include <ztest_assert.h>
-#include <sys/sem.h>
+#include <zephyr/ztest_assert.h>
+#include <zephyr/sys/sem.h>
 
-#include <net/socket.h>
-#include <net/dummy.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/net/dummy.h>
 
 #include "../../socket_helpers.h"
 
-void test_gethostname(void)
+ZTEST_USER(socket_misc_test_suite, test_gethostname)
 {
 	static ZTEST_BMEM char buf[80];
 	int res;
@@ -27,7 +27,7 @@ void test_gethostname(void)
 	zassert_equal(strcmp(buf, "ztest_hostname"), 0, "");
 }
 
-void test_inet_pton(void)
+ZTEST_USER(socket_misc_test_suite, test_inet_pton)
 {
 	int res;
 	uint8_t buf[32];
@@ -50,6 +50,11 @@ void test_inet_pton(void)
 	res = inet_pton(AF_INET6, "a:b:c:d:0:1:2:3z", buf);
 	zassert_equal(res, 0, "");
 }
+
+#define TEST_MY_IPV4_ADDR "192.0.2.1"
+#define TEST_PEER_IPV4_ADDR "192.0.2.2"
+#define TEST_MY_IPV6_ADDR "2001:db8::1"
+#define TEST_PEER_IPV6_ADDR "2001:db8::2"
 
 static struct in6_addr my_ipv6_addr1 = { { { 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0,
 					     0, 0, 0, 0, 0, 0, 0, 0x1 } } };
@@ -100,6 +105,9 @@ static int dummy_send(const struct device *dev, struct net_pkt *pkt)
 
 	/* Report it back to the interface. */
 	recv_pkt = net_pkt_clone(pkt, K_NO_WAIT);
+	if (recv_pkt == NULL) {
+		return -ENOMEM;
+	}
 
 	ret = net_recv_data(net_pkt_iface(recv_pkt), recv_pkt);
 	zassert_equal(ret, 0, "Cannot receive data (%d)", ret);
@@ -260,7 +268,7 @@ void test_so_bindtodevice(int sock_c, int sock_s, struct sockaddr *peer_addr,
 
 	zassert_equal_ptr(dev1, current_dev, "invalid interface used");
 
-	/* Server socket should now receive data from iterface 1 as well. */
+	/* Server socket should now receive data from interface 1 as well. */
 
 	k_msleep(10);
 
@@ -294,7 +302,7 @@ void test_ipv4_so_bindtodevice(void)
 
 	peer_addr.sin_family = AF_INET;
 	peer_addr.sin_port = htons(DST_PORT);
-	ret = inet_pton(AF_INET, CONFIG_NET_CONFIG_PEER_IPV4_ADDR,
+	ret = inet_pton(AF_INET, TEST_PEER_IPV4_ADDR,
 			&peer_addr.sin_addr);
 	zassert_equal(ret, 1, "inet_pton failed");
 
@@ -322,7 +330,7 @@ void test_ipv6_so_bindtodevice(void)
 
 	peer_addr.sin6_family = AF_INET6;
 	peer_addr.sin6_port = htons(DST_PORT);
-	ret = inet_pton(AF_INET6, CONFIG_NET_CONFIG_PEER_IPV6_ADDR,
+	ret = inet_pton(AF_INET6, TEST_PEER_IPV6_ADDR,
 			&peer_addr.sin6_addr);
 	zassert_equal(ret, 1, "inet_pton failed");
 
@@ -331,15 +339,114 @@ void test_ipv6_so_bindtodevice(void)
 			     sizeof(bind_addr));
 }
 
-void test_main(void)
+#define ADDR_SIZE(family) ((family == AF_INET) ? \
+			   sizeof(struct sockaddr_in) : \
+			   sizeof(struct sockaddr_in6))
+
+void test_getpeername(int family)
+{
+	int ret;
+	int sock_c;
+	int sock_s;
+	struct sockaddr peer_addr;
+	socklen_t peer_addr_len;
+	struct sockaddr srv_addr = { 0 };
+
+	srv_addr.sa_family = family;
+	if (family == AF_INET) {
+		net_sin(&srv_addr)->sin_port = htons(DST_PORT);
+		ret = inet_pton(AF_INET, TEST_MY_IPV4_ADDR,
+				&net_sin(&srv_addr)->sin_addr);
+	} else {
+		net_sin6(&srv_addr)->sin6_port = htons(DST_PORT);
+		ret = inet_pton(AF_INET6, TEST_MY_IPV6_ADDR,
+				&net_sin6(&srv_addr)->sin6_addr);
+	}
+	zassert_equal(ret, 1, "inet_pton failed");
+
+	/* UDP socket */
+	sock_c = socket(family, SOCK_DGRAM, IPPROTO_UDP);
+	zassert_true(sock_c >= 0, "socket open failed");
+
+	peer_addr_len = ADDR_SIZE(family);
+	ret = getpeername(sock_c, &peer_addr, &peer_addr_len);
+	zassert_equal(ret, -1, "getpeername shouldn've failed");
+	zassert_equal(errno, ENOTCONN, "getpeername returned invalid error");
+
+	ret = connect(sock_c, &srv_addr, ADDR_SIZE(family));
+	zassert_equal(ret, 0, "connect failed");
+
+	memset(&peer_addr, 0, sizeof(peer_addr));
+	peer_addr_len = ADDR_SIZE(family);
+	ret = getpeername(sock_c, &peer_addr, &peer_addr_len);
+	zassert_equal(ret, 0, "getpeername failed");
+	zassert_mem_equal(&peer_addr, &srv_addr, ADDR_SIZE(family),
+			 "obtained wrong address");
+
+	ret = close(sock_c);
+	zassert_equal(ret, 0, "close failed, %d", errno);
+
+	/* TCP socket */
+	sock_c = socket(family, SOCK_STREAM, IPPROTO_TCP);
+	zassert_true(sock_c >= 0, "socket open failed");
+	sock_s = socket(family, SOCK_STREAM, IPPROTO_TCP);
+	zassert_true(sock_s >= 0, "socket open failed");
+
+	ret = bind(sock_s, &srv_addr, ADDR_SIZE(family));
+	zassert_equal(ret, 0, "bind failed, %d", errno);
+
+	ret = listen(sock_s, 1);
+	zassert_equal(ret, 0, "listen failed, %d", errno);
+
+	peer_addr_len = ADDR_SIZE(family);
+	ret = getpeername(sock_c, &peer_addr, &peer_addr_len);
+	zassert_equal(ret, -1, "getpeername shouldn've failed");
+	zassert_equal(errno, ENOTCONN, "getpeername returned invalid error");
+
+	ret = connect(sock_c, &srv_addr, ADDR_SIZE(family));
+	zassert_equal(ret, 0, "connect failed");
+
+	memset(&peer_addr, 0, sizeof(peer_addr));
+	peer_addr_len = ADDR_SIZE(family);
+	ret = getpeername(sock_c, &peer_addr, &peer_addr_len);
+	zassert_equal(ret, 0, "getpeername failed");
+	zassert_mem_equal(&peer_addr, &srv_addr, ADDR_SIZE(family),
+			 "obtained wrong address");
+
+	ret = close(sock_c);
+	zassert_equal(ret, 0, "close failed, %d", errno);
+	ret = close(sock_s);
+	zassert_equal(ret, 0, "close failed, %d", errno);
+}
+
+
+void test_ipv4_getpeername(void)
+{
+	test_getpeername(AF_INET);
+}
+
+void test_ipv6_getpeername(void)
+{
+	test_getpeername(AF_INET6);
+}
+
+static void *setup(void)
 {
 	k_thread_system_pool_assign(k_current_get());
-
-	ztest_test_suite(socket_misc,
-			 ztest_user_unit_test(test_gethostname),
-			 ztest_user_unit_test(test_inet_pton),
-			 ztest_user_unit_test(test_ipv4_so_bindtodevice),
-			 ztest_user_unit_test(test_ipv6_so_bindtodevice));
-
-	ztest_run_test_suite(socket_misc);
+	return NULL;
 }
+
+
+ZTEST_USER(socket_misc_test_suite, test_ipv4)
+{
+	test_ipv4_so_bindtodevice();
+	test_ipv4_getpeername();
+}
+
+ZTEST_USER(socket_misc_test_suite, test_ipv6)
+{
+	test_ipv6_so_bindtodevice();
+	test_ipv6_getpeername();
+}
+
+ZTEST_SUITE(socket_misc_test_suite, NULL, setup, NULL, NULL, NULL);

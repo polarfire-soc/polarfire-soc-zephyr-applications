@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2018 Antmicro <www.antmicro.com>
+ * Copyright (c) 2021-2022 Microchip Technology Inc
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <arch/riscv/common/linker.ld>
+#include <zephyr/arch/riscv/common/linker.ld>

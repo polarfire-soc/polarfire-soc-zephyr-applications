@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <cmsis_os.h>
 
-#define NSEC_PER_MSEC		(NSEC_PER_USEC * USEC_PER_MSEC)
 #define MAX_VALID_SIGNAL_VAL	((1 << osFeature_Signals) - 1)
 
 void *k_thread_other_custom_data_get(struct k_thread *thread_id)

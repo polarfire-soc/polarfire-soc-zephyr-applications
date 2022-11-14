@@ -4,21 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <zephyr/types.h>
-#include <sys/util.h>
-#include <sys/byteorder.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/byteorder.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/mesh.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_MODEL)
 #define LOG_MODULE_NAME bt_mesh_cfg_srv
 #include "common/log.h"
+#include "common/bt_str.h"
 
 #include "host/testing.h"
 
@@ -37,6 +38,13 @@
 #include "friend.h"
 #include "settings.h"
 #include "cfg.h"
+
+static void node_reset_pending_handler(struct k_work *work)
+{
+	bt_mesh_reset();
+}
+
+static K_WORK_DEFINE(node_reset_pending, node_reset_pending_handler);
 
 static int comp_add_elem(struct net_buf_simple *buf, struct bt_mesh_elem *elem,
 			 bool primary)
@@ -271,14 +279,14 @@ static uint8_t mod_bind(struct bt_mesh_model *model, uint16_t key_idx)
 		return STATUS_INVALID_APPKEY;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(model->keys); i++) {
+	for (i = 0; i < model->keys_cnt; i++) {
 		/* Treat existing binding as success */
 		if (model->keys[i] == key_idx) {
 			return STATUS_SUCCESS;
 		}
 	}
 
-	for (i = 0; i < ARRAY_SIZE(model->keys); i++) {
+	for (i = 0; i < model->keys_cnt; i++) {
 		if (model->keys[i] == BT_MESH_KEY_UNUSED) {
 			model->keys[i] = key_idx;
 
@@ -303,7 +311,7 @@ static uint8_t mod_unbind(struct bt_mesh_model *model, uint16_t key_idx, bool st
 		return STATUS_INVALID_APPKEY;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(model->keys); i++) {
+	for (i = 0; i < model->keys_cnt; i++) {
 		if (model->keys[i] != key_idx) {
 			continue;
 		}
@@ -866,7 +874,7 @@ static size_t mod_sub_list_clear(struct bt_mesh_model *mod)
 	int i;
 
 	/* Unref stored labels related to this model */
-	for (i = 0, clear_count = 0; i < ARRAY_SIZE(mod->groups); i++) {
+	for (i = 0, clear_count = 0; i < mod->groups_cnt; i++) {
 		if (!BT_MESH_ADDR_IS_VIRTUAL(mod->groups[i])) {
 			if (mod->groups[i] != BT_MESH_ADDR_UNASSIGNED) {
 				mod->groups[i] = BT_MESH_ADDR_UNASSIGNED;
@@ -1039,7 +1047,7 @@ static int mod_sub_add(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	if (!BT_MESH_ADDR_IS_GROUP(sub_addr)) {
+	if (!BT_MESH_ADDR_IS_GROUP(sub_addr) && !BT_MESH_ADDR_IS_FIXED_GROUP(sub_addr)) {
 		status = STATUS_INVALID_ADDRESS;
 		goto send_status;
 	}
@@ -1117,7 +1125,7 @@ static int mod_sub_del(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	if (!BT_MESH_ADDR_IS_GROUP(sub_addr)) {
+	if (!BT_MESH_ADDR_IS_GROUP(sub_addr) && !BT_MESH_ADDR_IS_FIXED_GROUP(sub_addr)) {
 		status = STATUS_INVALID_ADDRESS;
 		goto send_status;
 	}
@@ -1148,7 +1156,7 @@ send_status:
 static enum bt_mesh_walk mod_sub_clear_visitor(struct bt_mesh_model *mod, void *user_data)
 {
 	if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER)) {
-		bt_mesh_lpn_group_del(mod->groups, ARRAY_SIZE(mod->groups));
+		bt_mesh_lpn_group_del(mod->groups, mod->groups_cnt);
 	}
 
 	mod_sub_list_clear(mod);
@@ -1198,13 +1206,13 @@ static int mod_sub_overwrite(struct bt_mesh_model *model,
 		goto send_status;
 	}
 
-	if (!BT_MESH_ADDR_IS_GROUP(sub_addr)) {
+	if (!BT_MESH_ADDR_IS_GROUP(sub_addr) && !BT_MESH_ADDR_IS_FIXED_GROUP(sub_addr)) {
 		status = STATUS_INVALID_ADDRESS;
 		goto send_status;
 	}
 
 
-	if (ARRAY_SIZE(mod->groups) > 0) {
+	if (mod->groups_cnt > 0) {
 		bt_mesh_model_extensions_walk(mod, mod_sub_clear_visitor, NULL);
 
 		mod->groups[0] = sub_addr;
@@ -1295,7 +1303,7 @@ static enum bt_mesh_walk mod_sub_list_visitor(struct bt_mesh_model *mod, void *c
 		return BT_MESH_WALK_CONTINUE;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(mod->groups); i++) {
+	for (i = 0; i < mod->groups_cnt; i++) {
 		if (mod->groups[i] == BT_MESH_ADDR_UNASSIGNED) {
 			continue;
 		}
@@ -1629,7 +1637,7 @@ static int mod_sub_va_overwrite(struct bt_mesh_model *model,
 	}
 
 
-	if (ARRAY_SIZE(mod->groups) > 0) {
+	if (mod->groups_cnt > 0) {
 
 		status = bt_mesh_va_add(label_uuid, &sub_addr);
 		if (status == STATUS_SUCCESS) {
@@ -2053,7 +2061,7 @@ send_list:
 	if (mod) {
 		int i;
 
-		for (i = 0; i < ARRAY_SIZE(mod->keys); i++) {
+		for (i = 0; i < mod->keys_cnt; i++) {
 			if (mod->keys[i] != BT_MESH_KEY_UNUSED) {
 				net_buf_simple_add_le16(&msg, mod->keys[i]);
 			}
@@ -2071,13 +2079,13 @@ static void reset_send_start(uint16_t duration, int err, void *cb_data)
 {
 	if (err) {
 		BT_ERR("Sending Node Reset Status failed (err %d)", err);
-		bt_mesh_reset();
+		k_work_submit(&node_reset_pending);
 	}
 }
 
 static void reset_send_end(int err, void *cb_data)
 {
-	bt_mesh_reset();
+	k_work_submit(&node_reset_pending);
 }
 
 static int node_reset(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,

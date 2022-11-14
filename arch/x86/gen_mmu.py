@@ -74,13 +74,13 @@ import struct
 import re
 import textwrap
 
-from distutils.version import LooseVersion
+from packaging import version
 
 import elftools
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
-if LooseVersion(elftools.__version__) < LooseVersion('0.24'):
+if version.parse(elftools.__version__) < version.parse('0.24'):
     sys.exit("pyelftools is out of date, need version 0.24 or later")
 
 
@@ -608,7 +608,7 @@ def parse_args():
     parser.add_argument("--map", action='append',
                         help=textwrap.dedent('''\
                             Map extra memory:
-                            <physical address>,<size>[,<flags:LUWXD>[,<virtual adderss>]]
+                            <physical address>,<size>[,<flags:LUWXD>[,<virtual address>]]
                             where flags can be empty or combination of:
                                 L - Large page (2MB or 4MB),
                                 U - Userspace accessible,

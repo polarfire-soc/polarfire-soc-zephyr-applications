@@ -6,10 +6,10 @@
 
 #define DT_DRV_COMPAT nxp_kinetis_temperature
 
-#include <device.h>
-#include <drivers/sensor.h>
-#include <drivers/adc.h>
-#include <logging/log.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/adc.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(temp_kinetis, CONFIG_SENSOR_LOG_LEVEL);
 
@@ -212,7 +212,7 @@ BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT) <= 1,
 		},							\
 	};								\
 									\
-	DEVICE_DT_INST_DEFINE(inst, temp_kinetis_init,			\
+	SENSOR_DEVICE_DT_INST_DEFINE(inst, temp_kinetis_init,		\
 			    NULL,					\
 			    &temp_kinetis_data_0,			\
 			    &temp_kinetis_config_0, POST_KERNEL,	\

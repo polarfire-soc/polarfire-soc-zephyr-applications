@@ -14,7 +14,7 @@
 #include <esp_system.h>
 #include <soc.h>
 #include <hal/cpu_hal.h>
-#include <drivers/entropy.h>
+#include <zephyr/drivers/entropy.h>
 
 static inline uint32_t entropy_esp32_get_u32(void)
 {
@@ -70,5 +70,5 @@ static const struct entropy_driver_api entropy_esp32_api_funcs = {
 
 DEVICE_DT_INST_DEFINE(0,
 		    entropy_esp32_init, NULL, NULL, NULL,
-		    PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,
+		    PRE_KERNEL_1, CONFIG_ENTROPY_INIT_PRIORITY,
 		    &entropy_esp32_api_funcs);

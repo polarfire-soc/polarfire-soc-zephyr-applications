@@ -11,9 +11,9 @@
 
 #include <errno.h>
 
-#include "settings/settings.h"
+#include <zephyr/settings/settings.h>
 #include "settings/settings_file.h"
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 
 
 bool settings_subsys_initialized;

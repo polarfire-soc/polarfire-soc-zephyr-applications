@@ -6,13 +6,13 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <zephyr/types.h>
 #include <errno.h>
-#include <init.h>
-#include <fs/fs.h>
-#include <fs/fs_sys.h>
-#include <sys/__assert.h>
+#include <zephyr/init.h>
+#include <zephyr/fs/fs.h>
+#include <zephyr/fs/fs_sys.h>
+#include <zephyr/sys/__assert.h>
 #include <ff.h>
 
 #define FATFS_MAX_FILE_NAME 12 /* Uses 8.3 SFN */
@@ -426,10 +426,10 @@ static int fatfs_mount(struct fs_mount_t *mountp)
 	    (mountp->flags & FS_MOUNT_FLAG_NO_FORMAT) == 0) {
 		uint8_t work[FF_MAX_SS];
 		MKFS_PARM mkfs_opt = {
-			.fmt = FM_FAT | FM_SFD,	/* Any suitable FAT */
+			.fmt = FM_ANY | FM_SFD,	/* Any suitable FAT */
 			.n_fat = 1,		/* One FAT fs table */
 			.align = 0,		/* Get sector size via diskio query */
-			.n_root = 512,		/* Max 512 root directory entries */
+			.n_root = CONFIG_FS_FATFS_MAX_ROOT_ENTRIES,
 			.au_size = 0		/* Auto calculate cluster size */
 		};
 
@@ -440,6 +440,10 @@ static int fatfs_mount(struct fs_mount_t *mountp)
 		}
 	}
 #endif /* CONFIG_FS_FATFS_MOUNT_MKFS */
+
+	if (res == FR_OK) {
+		mountp->flags |= FS_MOUNT_FLAG_USE_DISK_ACCESS;
+	}
 
 	return translate_error(res);
 

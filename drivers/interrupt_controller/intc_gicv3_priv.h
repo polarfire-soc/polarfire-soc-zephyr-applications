@@ -8,8 +8,8 @@
 #define ZEPHYR_INCLUDE_DRIVERS_INTC_GICV3_PRIV_H_
 
 #include <zephyr/types.h>
-#include <device.h>
-#include <sys/atomic.h>
+#include <zephyr/device.h>
+#include <zephyr/sys/atomic.h>
 
 /* Cache and Share ability for ITS & Redistributor LPI state tables */
 #define GIC_BASER_CACHE_NGNRNE		0x0UL /* Device-nGnRnE */
@@ -30,6 +30,7 @@
  */
 
 #define GIC_RDIST_BASE	DT_REG_ADDR_BY_IDX(DT_INST(0, arm_gic), 1)
+#define GIC_RDIST_SIZE	DT_REG_SIZE_BY_IDX(DT_INST(0, arm_gic), 1)
 
 /* SGI base is at 64K offset from Redistributor */
 #define GICR_SGI_BASE_OFF		0x10000
@@ -43,7 +44,7 @@
 #define GICR_PROPBASER			0x0070
 #define GICR_PENDBASER			0x0078
 
-/* Register bit definations */
+/* Register bit definitions */
 
 /* GICD_CTLR Interrupt group definitions */
 #define GICD_CTLR_ENABLE_G0		0
@@ -62,6 +63,12 @@
 #define GICR_CTLR_RWP			3
 
 /* GICR_TYPER */
+#define GICR_TYPER_AFFINITY_VALUE_SHIFT		32
+#define GICR_TYPER_AFFINITY_VALUE_MASK		0xFFFFFFFFUL
+#define GICR_TYPER_AFFINITY_VALUE_GET(_val)	MASK_GET(_val, GICR_TYPER_AFFINITY_VALUE)
+#define GICR_TYPER_LAST_SHIFT			4
+#define GICR_TYPER_LAST_MASK			0x10UL
+#define GICR_TYPER_LAST_GET(_val)		MASK_GET(_val, GICR_TYPER_LAST)
 #define GICR_TYPER_PROCESSOR_NUMBER_SHIFT	8
 #define GICR_TYPER_PROCESSOR_NUMBER_MASK	0xFFFFUL
 #define GICR_TYPER_PROCESSOR_NUMBER_GET(_val)	MASK_GET(_val, GICR_TYPER_PROCESSOR_NUMBER)

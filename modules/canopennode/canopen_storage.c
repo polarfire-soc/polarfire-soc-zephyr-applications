@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <settings/settings.h>
+#include <zephyr/settings/settings.h>
 
 #include <CANopen.h>
 #include <CO_Emergency.h>
@@ -13,7 +13,7 @@
 #include <canopennode.h>
 
 #define LOG_LEVEL CONFIG_CANOPEN_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(canopen_storage);
 
 /* 's', 'a', 'v', 'e' from LSB to MSB */
@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(canopen_storage);
 /* 'l', 'o', 'a', 'd' from LSB to MSB */
 #define RESTORE_PARAM_MAGIC 0x64616F6CUL
 
-/* Variables for reporing errors through CANopen once the stack is up */
+/* Variables for reporting errors through CANopen once the stack is up */
 static int canopen_storage_rom_error;
 static int canopen_storage_eeprom_error;
 
@@ -137,7 +137,7 @@ static int canopen_settings_set(const char *key, size_t len_rd,
 		len = read_cb(cb_arg, &eeprom, sizeof(eeprom));
 		if (len < 0) {
 			LOG_ERR("failed to restore object dictionary EEPROM"
-				" entries (err %d)", len);
+				" entries (err %zu)", len);
 			canopen_storage_eeprom_error = len;
 		} else {
 			if ((eeprom.FirstWord == CO_OD_FIRST_LAST_WORD) &&
@@ -160,7 +160,7 @@ static int canopen_settings_set(const char *key, size_t len_rd,
 		len = read_cb(cb_arg, &rom, sizeof(rom));
 		if (len < 0) {
 			LOG_ERR("failed to restore object dictionary ROM"
-				" entries (err %d)", len);
+				" entries (err %zu)", len);
 			canopen_storage_rom_error = len;
 		} else {
 			if ((rom.FirstWord == CO_OD_FIRST_LAST_WORD) &&

@@ -36,7 +36,7 @@ described below:
    :goals: flash
    :compact:
 
-To build the sample for `VM800C board`_ the shild must be defined as described
+To build the sample for `VM800C board`_ the shield must be defined as described
 below:
 
 .. zephyr-app-commands::
@@ -46,5 +46,5 @@ below:
    :goals: flash
    :compact:
 
-.. _VM800C board: https://www.ftdichip.com/Products/Modules/VM800C.html
-.. _FT800 EVE: https://www.ftdichip.com/Products/ICs/FT800.html
+.. _VM800C board: https://www.ftdichip.com/old2020/Products/Modules/VM800C.html
+.. _FT800 EVE: https://www.ftdichip.com/old2020/Products/ICs/FT800.html

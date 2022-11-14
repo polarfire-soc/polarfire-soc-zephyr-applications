@@ -9,12 +9,12 @@ set(MDB_BASIC_OPTIONS -nooptions -nogoifmain -toggle=include_local_symbols=1)
 
 # remove previous .sc.project folder which has temporary settings for MDB.
 set(MDB_OPTIONS ${CMAKE_COMMAND} -E rm -rf ${APPLICATION_BINARY_DIR}/.sc.project)
-if(CONFIG_MP_NUM_CPUS GREATER 1)
+if(CONFIG_MP_MAX_NUM_CPUS GREATER 1)
   set(MULTIFILES ${MDB} -multifiles=)
-  foreach(val RANGE ${CONFIG_MP_NUM_CPUS})
-    if(val LESS CONFIG_MP_NUM_CPUS)
-      MATH(EXPR PSET_NUM "${CONFIG_MP_NUM_CPUS}-${val}")
-      MATH(EXPR CORE_NUM "${CONFIG_MP_NUM_CPUS}-${val}-1")
+  foreach(val RANGE ${CONFIG_MP_MAX_NUM_CPUS})
+    if(val LESS CONFIG_MP_MAX_NUM_CPUS)
+      MATH(EXPR PSET_NUM "${CONFIG_MP_MAX_NUM_CPUS}-${val}")
+      MATH(EXPR CORE_NUM "${CONFIG_MP_MAX_NUM_CPUS}-${val}-1")
       if(PSET_NUM GREATER 0)
         list(APPEND MDB_OPTIONS &&)
       endif()
@@ -34,7 +34,7 @@ else()
 endif()
 
 string(REPLACE ";" " " MDB_COMMAND "${MDB_OPTIONS}")
-add_custom_target(run
+add_custom_target(run_nsim
   COMMAND
   ${MDB_OPTIONS}
   ${APPLICATION_BINARY_DIR}/zephyr/${KERNEL_ELF_NAME}
@@ -49,7 +49,7 @@ find_program(
   nsimdrv
   )
 
-add_custom_target(run
+add_custom_target(run_nsim
   COMMAND
   ${NSIM}
   -propsfile
@@ -61,7 +61,7 @@ add_custom_target(run
   USES_TERMINAL
   )
 
-add_custom_target(debugserver
+add_custom_target(debugserver_nsim
   COMMAND
   ${NSIM}
   -propsfile

@@ -13,14 +13,13 @@
  */
 
 #include <soc.h>
-#include <devicetree.h>
+#include <zephyr/devicetree.h>
 
-#include <autoconf.h>
-#include <linker/sections.h>
-#include <linker/devicetree_regions.h>
+#include <zephyr/linker/sections.h>
+#include <zephyr/linker/devicetree_regions.h>
 
-#include <linker/linker-defs.h>
-#include <linker/linker-tool.h>
+#include <zephyr/linker/linker-defs.h>
+#include <zephyr/linker/linker-tool.h>
 
 #ifdef CONFIG_XIP
 #define ROMABLE_REGION              ROM
@@ -29,7 +28,6 @@
 #endif
 #define RAMABLE_REGION              RAM
 
-#define _VECTOR_SECTION_NAME        vector
 #define _EXCEPTION_SECTION_NAME     exceptions
 #define _RESET_SECTION_NAME         reset
 
@@ -87,9 +85,7 @@ MEMORY
 #endif
     RAM (rwx) : ORIGIN = RAM_BASE, LENGTH = RAM_SIZE
 
-    /* Data & Instruction Tightly Coupled Memory */
-    LINKER_DT_REGION_FROM_NODE(ITCM, rw, DT_CHOSEN(zephyr_itcm))
-    LINKER_DT_REGION_FROM_NODE(DTCM, rw, DT_CHOSEN(zephyr_dtcm))
+    LINKER_DT_REGIONS()
 
     /* Used by and documented in include/linker/intlist.ld */
     IDT_LIST  (wx)      : ORIGIN = 0xFFFFF7FF, LENGTH = 2K
@@ -100,7 +96,7 @@ ENTRY(CONFIG_KERNEL_ENTRY)
 SECTIONS
     {
 
-#include <linker/rel-sections.ld>
+#include <zephyr/linker/rel-sections.ld>
 
     /*
      * The .plt and .iplt are here according to
@@ -119,18 +115,10 @@ SECTIONS
     GROUP_START(ROMABLE_REGION)
     __rom_region_start = ROM_BASE;
 
-    SECTION_PROLOGUE(_VECTOR_SECTION_NAME,,)
-    {
-		/* In XIP mode, the .init section must be at the start of ROM */
-		. = ALIGN(4);
-		KEEP(*(.init.*))
-		. = ALIGN(4);
-		KEEP(*(.vectors.*))
-    } GROUP_LINK_IN(ROMABLE_REGION)
-
     SECTION_PROLOGUE(rom_start,,)
     {
 		. = ALIGN(16);
+		KEEP(*(.init.*))
 /* Located in generated directory. This file is populated by calling
  * zephyr_linker_sources(ROM_START ...).
  */
@@ -159,22 +147,14 @@ SECTIONS
 		*(.text)
 		*(".text.*")
 		*(.gnu.linkonce.t.*)
-#include <linker/kobject-text.ld>
-#ifdef CONFIG_SOC_FLASH_RAMCODE_SECTION
-		. = ALIGN(0x1000);
-		_ram_code_start = .;
-		KEEP(*(.__ram_code))
-		__ram_code_size = . - _ram_code_start;
-		ASSERT((__ram_code_size <= 0x1000),
-			"__ram_code_size <= 4k bytes");
-#endif
+#include <zephyr/linker/kobject-text.ld>
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
     __text_region_end = .;
 
 	__rodata_region_start = .;
-#include <linker/common-rom.ld>
-#include <linker/thread-local-storage.ld>
+#include <zephyr/linker/common-rom.ld>
+#include <zephyr/linker/thread-local-storage.ld>
 
     SECTION_PROLOGUE(_RODATA_SECTION_NAME,,)
 	{
@@ -190,11 +170,11 @@ SECTIONS
  * zephyr_linker_sources() Cmake function.
  */
 #include <snippets-rodata.ld>
-#include <linker/kobject-rom.ld>
+#include <zephyr/linker/kobject-rom.ld>
 	. = ALIGN(4);
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
-#include <linker/cplusplus-rom.ld>
+#include <zephyr/linker/cplusplus-rom.ld>
 	__rodata_region_end = .;
 	MPU_ALIGN(__rodata_region_end - __rom_region_start);
     GROUP_END(ROMABLE_REGION)
@@ -235,8 +215,8 @@ SECTIONS
 		  __bss_end = ALIGN(4);
 	}  GROUP_DATA_LINK_IN(RAMABLE_REGION, RAMABLE_REGION)
 
-#include <linker/common-noinit.ld>
-#include <linker/cplusplus-ram.ld>
+#include <zephyr/linker/common-noinit.ld>
+#include <zephyr/linker/cplusplus-ram.ld>
 
     __data_region_start = .;
 
@@ -279,8 +259,8 @@ SECTIONS
 
 	__data_region_load_start = LOADADDR(_DATA_SECTION_NAME);
 
-#include <linker/common-ram.ld>
-#include <linker/kobject-data.ld>
+#include <zephyr/linker/common-ram.ld>
+#include <zephyr/linker/kobject-data.ld>
 
 /* Located in generated directory. This file is populated by the
  * zephyr_linker_sources() Cmake function.
@@ -361,7 +341,7 @@ GROUP_END(DTCM)
 
      GROUP_END(RAMABLE_REGION)
 
-#include <linker/debug-sections.ld>
+#include <zephyr/linker/debug-sections.ld>
 
     /DISCARD/ : { *(.note.GNU-stack) }
 
@@ -372,13 +352,18 @@ GROUP_END(DTCM)
 	}
 
 /* Must be last in romable region */
-SECTION_PROLOGUE(.last_section,(NOLOAD),)
+SECTION_PROLOGUE(.last_section,,)
 {
+#ifdef CONFIG_LINKER_LAST_SECTION_ID
+  /* Fill last section with a word to ensure location counter and actual rom
+   * region data usage match. */
+  LONG(CONFIG_LINKER_LAST_SECTION_ID_PATTERN)
+#endif
 } GROUP_LINK_IN(ROMABLE_REGION)
 
 /* To provide the image size as a const expression,
  * calculate this value here. */
-__rom_region_end = LOADADDR(.last_section);
+__rom_region_end = LOADADDR(.last_section) + SIZEOF(.last_section);
 __rom_region_size = __rom_region_end - __rom_region_start;
 
 }

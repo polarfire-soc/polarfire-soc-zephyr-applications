@@ -10,16 +10,16 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/printk.h>
-#include <sys/util.h>
-#include <sys/byteorder.h>
-#include <zephyr.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/kernel.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/gatt.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
 
 #define NUMBER_OF_SLOTS 1
 #define EDS_VERSION 0x00
@@ -490,7 +490,7 @@ static ssize_t write_adv_data(struct bt_conn *conn,
 		 */
 		slot->ad[2].data_len = MIN(slot->ad[2].data_len,
 					   len + EDS_URL_WRITE_OFFSET);
-		memcpy(&slot->ad[2].data + EDS_URL_WRITE_OFFSET, buf,
+		memcpy((uint8_t *) slot->ad[2].data + EDS_URL_WRITE_OFFSET, buf,
 		       slot->ad[2].data_len - EDS_URL_WRITE_OFFSET);
 
 		/* Restart slot */

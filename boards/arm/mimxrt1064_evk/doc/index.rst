@@ -14,8 +14,7 @@ ideal for real-time applications such as High-Speed GPIO, CAN-FD, and
 synchronous parallel NAND/NOR/PSRAM controller. The i.MX RT1064 runs on the
 Arm® Cortex-M7® core up to 600 MHz.
 
-.. image:: ./mimxrt1064_evk.jpg
-   :width: 600px
+.. image:: mimxrt1064_evk.jpg
    :align: center
    :alt: MIMXRT1064-EVK
 
@@ -85,8 +84,11 @@ these references:
 Supported Features
 ==================
 
-The mimxrt1064_evk board configuration supports the following hardware
-features:
+NXP considers the MIMXRT1064-EVK as the superset board for the i.MX RT10xx
+family of MCUs.  This board is a focus for NXP's Full Platform Support for
+Zephyr, to better enable the entire RT10xx family.  NXP prioritizes enabling
+this board with new support for Zephyr features.  The mimxrt1064_evk board
+configuration supports the following hardware features:
 
 +-----------+------------+-------------------------------------+
 | Interface | Controller | Driver/Component                    |
@@ -114,6 +116,8 @@ features:
 | UART      | on-chip    | serial port-polling;                |
 |           |            | serial port-interrupt               |
 +-----------+------------+-------------------------------------+
+| ADC       | on-chip    | adc                                 |
++-----------+------------+-------------------------------------+
 | ENET      | on-chip    | ethernet                            |
 +-----------+------------+-------------------------------------+
 | USB       | on-chip    | USB device                          |
@@ -122,11 +126,16 @@ features:
 +-----------+------------+-------------------------------------+
 | SPI       | on-chip    | spi                                 |
 +-----------+------------+-------------------------------------+
+| GPT       | on-chip    | gpt                                 |
++-----------+------------+-------------------------------------+
 | DMA       | on-chip    | dma                                 |
 +-----------+------------+-------------------------------------+
 | HWINFO    | on-chip    | Unique device serial number         |
 +-----------+------------+-------------------------------------+
-
+| TRNG      | on-chip    | entropy                             |
++-----------+------------+-------------------------------------+
+| FLEXSPI   | on-chip    | flash programming                   |
++-----------+------------+-------------------------------------+
 
 The default configuration can be found in the defconfig file:
 ``boards/arm/mimxrt1064_evk/mimxrt1064_evk_defconfig``
@@ -263,6 +272,10 @@ The MIMXRT1064 SoC has four pairs of pinmux/gpio controllers.
 +---------------+-----------------+---------------------------+
 | GPIO_SD_B1_11 | FLEXSPIA_DATA03 | QSPI Flash                |
 +---------------+-----------------+---------------------------+
+| GPIO_AD_B1_11 | ADC             | ADC1 Channel 0            |
++---------------+-----------------+---------------------------+
+| GPIO_AD_B1_10 | ADC             | ADC1 Channel 1            |
++---------------+-----------------+---------------------------+
 
 .. note::
         In order to use the SPI peripheral on this board, resistors R278, R279,
@@ -271,8 +284,8 @@ The MIMXRT1064 SoC has four pairs of pinmux/gpio controllers.
 System Clock
 ============
 
-The MIMXRT1064 SoC is configured to use the 24 MHz external oscillator on the
-board with the on-chip PLL to generate a 600 MHz core clock.
+The MIMXRT1064 SoC is configured to use the 32 KHz low frequency oscillator on
+the board as a source for the GPT timer to generate a system clock.
 
 Serial Port
 ===========
@@ -288,6 +301,11 @@ Build and flash applications as usual (see :ref:`build_an_application` and
 
 Configuring a Debug Probe
 =========================
+
+.. note::
+	When the device transitions into low power states, the debugger may be
+	unable to access the chip. Use caution when enabling ``CONFIG_PM``, and
+	if the debugger cannot flash the part, see :ref:`Troubleshooting RT1064`
 
 A debug probe is used for both flashing and debugging the board. This board is
 configured by default to use the :ref:`opensda-daplink-onboard-debug-probe`,
@@ -326,6 +344,12 @@ etc.):
 - Parity: None
 - Stop bits: 1
 
+Using SWO
+---------
+SWO can be used as a logging backend, by setting ``CONFIG_LOG_BACKEND_SWO=y``.
+Your SWO viewer should be configured with a CPU frequency of 132MHz, and
+SWO frequency of 7500KHz.
+
 Flashing
 ========
 
@@ -362,12 +386,15 @@ should see the following message in the terminal:
    ***** Booting Zephyr OS v1.14.0-rc1 *****
    Hello World! mimxrt1064_evk
 
+
+.. _Troubleshooting RT1064:
+
 Troubleshooting
 ===============
 
 If the debug probe fails to connect with the following error, it's possible
 that the boot header in QSPI flash is invalid or corrupted. The boot header is
-configured by :kconfig:`CONFIG_NXP_IMX_RT_BOOT_HEADER`.
+configured by :kconfig:option:`CONFIG_NXP_IMX_RT_BOOT_HEADER`.
 
 .. code-block:: console
 

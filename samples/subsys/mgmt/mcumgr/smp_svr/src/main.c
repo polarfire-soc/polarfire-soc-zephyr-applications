@@ -5,15 +5,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <stats/stats.h>
-#include <usb/usb_device.h>
+#include <zephyr/kernel.h>
+#include <zephyr/stats/stats.h>
+#include <zephyr/usb/usb_device.h>
 
 #ifdef CONFIG_MCUMGR_CMD_FS_MGMT
-#include <device.h>
-#include <fs/fs.h>
+#include <zephyr/device.h>
+#include <zephyr/fs/fs.h>
 #include "fs_mgmt/fs_mgmt.h"
-#include <fs/littlefs.h>
+#include <zephyr/fs/littlefs.h>
 #endif
 #ifdef CONFIG_MCUMGR_CMD_OS_MGMT
 #include "os_mgmt/os_mgmt.h"
@@ -27,15 +27,15 @@
 #ifdef CONFIG_MCUMGR_CMD_SHELL_MGMT
 #include "shell_mgmt/shell_mgmt.h"
 #endif
-#ifdef CONFIG_MCUMGR_CMD_FS_MGMT
-#include "fs_mgmt/fs_mgmt.h"
-#endif
 
 #define LOG_LEVEL LOG_LEVEL_DBG
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(smp_sample);
 
 #include "common.h"
+
+#define STORAGE_PARTITION_LABEL	storage_partition
+#define STORAGE_PARTITION_ID	FIXED_PARTITION_ID(STORAGE_PARTITION_LABEL)
 
 /* Define an example stats group; approximates seconds since boot. */
 STATS_SECT_START(smp_svr_stats)
@@ -55,7 +55,7 @@ FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(cstorage);
 static struct fs_mount_t littlefs_mnt = {
 	.type = FS_LITTLEFS,
 	.fs_data = &cstorage,
-	.storage_dev = (void *)FLASH_AREA_ID(storage),
+	.storage_dev = (void *)STORAGE_PARTITION_ID,
 	.mnt_point = "/lfs1"
 };
 #endif
@@ -90,9 +90,6 @@ void main(void)
 #ifdef CONFIG_MCUMGR_CMD_SHELL_MGMT
 	shell_mgmt_register_group();
 #endif
-#ifdef CONFIG_MCUMGR_CMD_FS_MGMT
-	fs_mgmt_register_group();
-#endif
 #ifdef CONFIG_MCUMGR_SMP_BT
 	start_smp_bluetooth();
 #endif
@@ -108,7 +105,7 @@ void main(void)
 		}
 	}
 	/* using __TIME__ ensure that a new binary will be built on every
-	 * compile which is convient when testing firmware upgrade.
+	 * compile which is convenient when testing firmware upgrade.
 	 */
 	LOG_INF("build time: " __DATE__ " " __TIME__);
 

@@ -13,10 +13,38 @@ config SOC_FAMILY
 	depends on SOC_FAMILY_RISCV_PRIVILEGE
 
 config RISCV_HAS_PLIC
-	bool "Does the SOC provide support for a Platform Level Interrupt Controller"
+	bool "Does the SOC provide support for a Platform Level Interrupt Controller (PLIC)"
 	depends on SOC_FAMILY_RISCV_PRIVILEGE
 	help
-	  Does the SOC provide support for a Platform Level Interrupt Controller
+	  Does the SOC provide support for a Platform Level Interrupt Controller (PLIC).
 
+config RISCV_HAS_CLIC
+	bool "Does the SOC provide support for a Core-Local Interrupt Controller (CLIC)"
+	depends on SOC_FAMILY_RISCV_PRIVILEGE
+	help
+	  Does the SOC provide support for a Core-Local Interrupt Controller (CLIC).
+
+config RISCV_MTVEC_VECTORED_MODE
+	bool "Should the SOC use mtvec in vectored mode"
+	depends on SOC_FAMILY_RISCV_PRIVILEGE
+	help
+	  Should the SOC use mtvec in vectored mode
+
+config RV_MP_TOTAL_NUM_CPUS
+	int "Total number of CPUs/cores"
+	default 1
+	range 1 5
+	help
+	  Number of cores in the system including those not used by Zephyr.
+
+config RV_BASE_CPU
+	int "Starting CPU number"
+	default 0
+	help
+	  This option sets the starting cpu id for the SMP core.
+	  For RISC-V systems such as MPFS and FU540 this would be set to 1 to
+	  skip the E51 hart 0 as it is not usable in SMP configurations.
+	  This can also be used in conjunction with MP_NUM_CPUS to select a
+	  subset of available CPUs to use for Zephyr.
 
 source "soc/riscv/riscv-privilege/*/Kconfig.soc"

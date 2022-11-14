@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <arch/cpu.h>
-#include <arch/arm/aarch32/cortex_m/cmsis.h>
-#include <kernel_structs.h>
+#include <zephyr/ztest.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/arch/arm/aarch32/cortex_m/cmsis.h>
+#include <zephyr/kernel_structs.h>
 #include <offsets_short_arch.h>
 #include <ksched.h>
 
@@ -68,25 +68,27 @@ static void load_callee_saved_regs(const _callee_saved_t *regs)
 	__asm__ volatile (
 		"mov r1, r7;\n\t"
 		"mov r0, %0;\n\t"
-		"ldmia r0!, {r4-r7};\n\t"
+		"add r0, #16;\n\t"
 		"ldmia r0!, {r4-r7};\n\t"
 		"mov r8, r4;\n\t"
 		"mov r9, r5;\n\t"
 		"mov r10, r6;\n\t"
 		"mov r11, r7;\n\t"
+		"sub r0, #32;\n\t"
+		"ldmia r0!, {r4-r7};\n\t"
 		"mov r7, r1;\n\t"
-		:
+		: /* no output */
 		: "r" (regs)
-		: "memory"
+		: "memory", "r1", "r0"
 	);
 #elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)
 	__asm__ volatile (
 		"mov r1, r7;\n\t"
 		"ldmia %0, {v1-v8};\n\t"
 		"mov r7, r1;\n\t"
-		:
+		: /* no output */
 		: "r" (regs)
-		: "memory"
+		: "memory", "r1"
 	);
 #endif
 	__DSB();
@@ -178,38 +180,38 @@ static void verify_fp_callee_saved(const struct _preempt_float *src,
 		" 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x\n"
 		" expected:  0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x"
 		" 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x\n",
-		src->s16,
-		src->s17,
-		src->s18,
-		src->s19,
-		src->s20,
-		src->s21,
-		src->s22,
-		src->s23,
-		src->s24,
-		src->s25,
-		src->s26,
-		src->s27,
-		src->s28,
-		src->s29,
-		src->s30,
-		src->s31,
-		dst->s16,
-		dst->s17,
-		dst->s18,
-		dst->s19,
-		dst->s20,
-		dst->s21,
-		dst->s22,
-		dst->s23,
-		dst->s24,
-		dst->s25,
-		dst->s26,
-		dst->s27,
-		dst->s28,
-		dst->s29,
-		dst->s30,
-		dst->s31
+		(double)src->s16,
+		(double)src->s17,
+		(double)src->s18,
+		(double)src->s19,
+		(double)src->s20,
+		(double)src->s21,
+		(double)src->s22,
+		(double)src->s23,
+		(double)src->s24,
+		(double)src->s25,
+		(double)src->s26,
+		(double)src->s27,
+		(double)src->s28,
+		(double)src->s29,
+		(double)src->s30,
+		(double)src->s31,
+		(double)dst->s16,
+		(double)dst->s17,
+		(double)dst->s18,
+		(double)dst->s19,
+		(double)dst->s20,
+		(double)dst->s21,
+		(double)dst->s22,
+		(double)dst->s23,
+		(double)dst->s24,
+		(double)dst->s25,
+		(double)dst->s26,
+		(double)dst->s27,
+		(double)dst->s28,
+		(double)dst->s29,
+		(double)dst->s30,
+		(double)dst->s31
 	);
 }
 
@@ -334,26 +336,44 @@ static void alt_thread_entry(void)
 	 */
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE)
 	__asm__ volatile (
-		"push {r4,r5,r6,r7};\n\t"
-		"mov r4, r8;\n\t"
-		"mov r5, r9;\n\t"
-		"push {r4, r5};\n\t"
-		"mov r4, r10;\n\t"
-		"mov r5, r11;\n\t"
-		"push {r4, r5};\n\t"
-		"push {r0, r1};\n\t"
-		"mov r1, r7;\n\t"
+		/* Stash r4-r11 in stack, they will be restored much later in
+		 * another inline asm -- that should be reworked since stack
+		 * must be balanced when we leave any inline asm. We could
+		 * use simply an alternative stack for storing them instead
+		 * of the function's stack.
+		 */
+		"push {r4-r7};\n\t"
+		"mov r2, r8;\n\t"
+		"mov r3, r9;\n\t"
+		"push {r2, r3};\n\t"
+		"mov r2, r10;\n\t"
+		"mov r3, r11;\n\t"
+		"push {r2, r3};\n\t"
+
+		/* Save r0 and r7 since we want to preserve them but they
+		 * are used below: r0 is used as a copy of struct pointer
+		 * we don't want to mess and r7 is the frame pointer which
+		 * we must not clobber it.
+		 */
+		"push {r0, r7};\n\t"
+
+		/* Load struct into r4-r11 */
 		"mov r0, %0;\n\t"
-		"ldmia r0!, {r4-r7};\n\t"
+		"add r0, #16;\n\t"
 		"ldmia r0!, {r4-r7};\n\t"
 		"mov r8, r4;\n\t"
 		"mov r9, r5;\n\t"
 		"mov r10, r6;\n\t"
 		"mov r11, r7;\n\t"
-		"mov r7, r1;\n\t"
-		"pop {r0, r1};\n\t"
-		:	: "r" (&ztest_thread_callee_saved_regs_container)
-		: "memory"
+		"sub r0, #32;\n\t"
+		"ldmia r0!, {r4-r7};\n\t"
+
+		/* Restore r0 and r7 */
+		"pop {r0, r7};\n\t"
+
+		: /* no output */
+		: "r" (&ztest_thread_callee_saved_regs_container)
+		: "memory", "r0", "r2", "r3"
 	);
 #elif defined(CONFIG_ARMV7_M_ARMV8_M_MAINLINE)
 	__asm__ volatile (
@@ -363,8 +383,9 @@ static void alt_thread_entry(void)
 		"ldmia %0, {v1-v8};\n\t"
 		"mov r7, r0;\n\t"
 		"pop {r0, r1};\n\t"
-		: : "r" (&ztest_thread_callee_saved_regs_container)
-		: "memory"
+		: /* no output */
+		: "r" (&ztest_thread_callee_saved_regs_container)
+		: "memory", "r0"
 	);
 #endif
 
@@ -403,7 +424,7 @@ static void alt_thread_entry(void)
 		"Alternative thread: switch flag not false on thread exit\n");
 }
 
-void test_arm_thread_swap(void)
+ZTEST(arm_thread_swap, test_arm_thread_swap)
 {
 	int test_flag;
 

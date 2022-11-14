@@ -4,21 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_eth_bridge, CONFIG_NET_ETHERNET_BRIDGE_LOG_LEVEL);
 
-#include <net/net_core.h>
-#include <net/net_l2.h>
-#include <net/net_if.h>
-#include <net/ethernet.h>
-#include <net/ethernet_bridge.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/net/net_l2.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/ethernet.h>
+#include <zephyr/net/ethernet_bridge.h>
 
-#include <sys/slist.h>
+#include <zephyr/sys/slist.h>
 
 #include "bridge.h"
 
 extern struct eth_bridge _eth_bridge_list_start[];
 extern struct eth_bridge _eth_bridge_list_end[];
+
+static void lock_bridge(struct eth_bridge *br)
+{
+	/* Lazy-evaluate initialization.  The ETH_BRIDGE_INITIALIZER()
+	 * macro assumed that k_mutex can be statically initialized,
+	 * and it can't.  Post-zync, this will actually be possible
+	 * and we can come back and fix this.
+	 */
+	if (!br->initialized) {
+		k_mutex_init(&br->lock);
+		br->initialized = true;
+	}
+	k_mutex_lock(&br->lock, K_FOREVER);
+}
 
 void net_eth_bridge_foreach(eth_bridge_cb_t cb, void *user_data)
 {
@@ -59,7 +73,7 @@ int eth_bridge_iface_add(struct eth_bridge *br, struct net_if *iface)
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&br->lock, K_FOREVER);
+	lock_bridge(br);
 
 	if (ctx->bridge.instance != NULL) {
 		k_mutex_unlock(&br->lock);
@@ -92,7 +106,7 @@ int eth_bridge_iface_remove(struct eth_bridge *br, struct net_if *iface)
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&br->lock, K_FOREVER);
+	lock_bridge(br);
 
 	if (ctx->bridge.instance != br) {
 		k_mutex_unlock(&br->lock);
@@ -123,7 +137,7 @@ int eth_bridge_iface_allow_tx(struct net_if *iface, bool allow)
 
 int eth_bridge_listener_add(struct eth_bridge *br, struct eth_bridge_listener *l)
 {
-	k_mutex_lock(&br->lock, K_FOREVER);
+	lock_bridge(br);
 	sys_slist_append(&br->listeners, &l->node);
 	k_mutex_unlock(&br->lock);
 	return 0;
@@ -131,7 +145,7 @@ int eth_bridge_listener_add(struct eth_bridge *br, struct eth_bridge_listener *l
 
 int eth_bridge_listener_remove(struct eth_bridge *br, struct eth_bridge_listener *l)
 {
-	k_mutex_lock(&br->lock, K_FOREVER);
+	lock_bridge(br);
 	sys_slist_find_and_remove(&br->listeners, &l->node);
 	k_mutex_unlock(&br->lock);
 	return 0;
@@ -164,7 +178,7 @@ enum net_verdict net_eth_bridge_input(struct ethernet_context *ctx,
 		return NET_DROP;
 	}
 
-	k_mutex_lock(&br->lock, K_FOREVER);
+	lock_bridge(br);
 
 	/*
 	 * Send packet to all registered interfaces for now.

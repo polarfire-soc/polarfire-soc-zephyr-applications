@@ -8,11 +8,14 @@ if BOARD_BL653_DVK
 config BOARD
 	default "bl653_dvk"
 
-config IEEE802154_NRF5
-	default y
-	depends on IEEE802154
-
 config BT_CTLR
 	default BT
+
+if DAC
+
+config I2C
+	default y
+
+endif # DAC
 
 endif # BOARD_BL653_DVK

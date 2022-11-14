@@ -4,23 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <ztest.h>
-#include <device.h>
-#include <pm/pm.h>
+#include <zephyr/kernel.h>
+#include <zephyr/ztest.h>
+#include <zephyr/pm/pm.h>
+#include <zephyr/pm/device.h>
 
-#define DEV_NAME DT_NODELABEL(gpio0)
-
-
-static const struct device *dev;
+static const struct device *const dev =
+	DEVICE_DT_GET(DT_NODELABEL(gpio0));
 static uint8_t sleep_count;
 
 
-void pm_power_state_set(struct pm_state_info info)
+void pm_state_set(enum pm_state state, uint8_t substate_id)
 {
-	ARG_UNUSED(info);
+	ARG_UNUSED(substate_id);
 
-	enum pm_device_state state;
+	enum pm_device_state dev_state;
 
 	switch (sleep_count) {
 	case 1:
@@ -28,76 +26,84 @@ void pm_power_state_set(struct pm_state_info info)
 		 * Devices are suspended before SoC on PM_STATE_SUSPEND_TO_RAM, that is why
 		 * we can check the device state here.
 		 */
-		zassert_equal(info.state, PM_STATE_SUSPEND_TO_RAM, "Wrong system state");
+		zassert_equal(state, PM_STATE_SUSPEND_TO_RAM, "Wrong system state");
 
-		(void)pm_device_state_get(dev, &state);
-		zassert_equal(state, PM_DEVICE_STATE_SUSPENDED, "Wrong device state");
+		(void)pm_device_state_get(dev, &dev_state);
+		zassert_equal(dev_state, PM_DEVICE_STATE_SUSPENDED, "Wrong device state");
 
 		/* Enable wakeup source. Next time the system is called
 		 * to sleep, this device will still be active.
 		 */
-		(void)pm_device_wakeup_enable((struct device *)dev, true);
+		(void)pm_device_wakeup_enable(dev, true);
 		break;
 	case 2:
-		zassert_equal(info.state, PM_STATE_SUSPEND_TO_RAM, "Wrong system state");
+		zassert_equal(state, PM_STATE_SUSPEND_TO_RAM, "Wrong system state");
 
 		/* Second time this function is called, the system is asked to standby
 		 * and devices were suspended.
 		 */
-		(void)pm_device_state_get(dev, &state);
-		zassert_equal(state, PM_DEVICE_STATE_ACTIVE, "Wrong device state");
+		(void)pm_device_state_get(dev, &dev_state);
+		zassert_equal(dev_state, PM_DEVICE_STATE_ACTIVE, "Wrong device state");
 		break;
 	default:
 		break;
 	}
 }
 
-void pm_power_state_exit_post_ops(struct pm_state_info info)
+void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 {
+	ARG_UNUSED(state);
+	ARG_UNUSED(substate_id);
+
 	irq_unlock(0);
 }
 
-struct pm_state_info pm_policy_next_state(int32_t ticks)
+const struct pm_state_info *pm_policy_next_state(uint8_t cpu, int32_t ticks)
 {
+	static const struct pm_state_info state = {
+		.state = PM_STATE_SUSPEND_TO_RAM
+	};
+
+	ARG_UNUSED(cpu);
+
 	while (sleep_count < 3) {
 		sleep_count++;
-		return (struct pm_state_info){PM_STATE_SUSPEND_TO_RAM, 0, 0, 0};
+		return &state;
 	}
 
-	return (struct pm_state_info){PM_STATE_ACTIVE, 0, 0, 0};
+	return NULL;
 }
 
-void test_wakeup_device_api(void)
+ZTEST(wakeup_device_1cpu, test_wakeup_device_api)
 {
 	bool ret = false;
 
-	dev = DEVICE_DT_GET(DEV_NAME);
-	zassert_not_null(dev, "Failed to get device");
+	zassert_true(device_is_ready(dev), "Device not ready");
 
 	ret = pm_device_wakeup_is_capable(dev);
-	zassert_true(ret, "Device marked as capable");
+	zassert_true(ret, "Device not marked as capable");
 
-	ret = pm_device_wakeup_enable((struct device *)dev, true);
+	ret = pm_device_wakeup_enable(dev, true);
 	zassert_true(ret, "Could not enable wakeup source");
 
 	ret = pm_device_wakeup_is_enabled(dev);
 	zassert_true(ret, "Wakeup source not enabled");
 
-	ret = pm_device_wakeup_enable((struct device *)dev, false);
+	ret = pm_device_wakeup_enable(dev, false);
 	zassert_true(ret, "Could not disable wakeup source");
 
 	ret = pm_device_wakeup_is_enabled(dev);
 	zassert_false(ret, "Wakeup source is enabled");
 }
 
-void test_wakeup_device_system_pm(void)
+ZTEST(wakeup_device_1cpu, test_wakeup_device_system_pm)
 {
 	/*
 	 * Trigger system PM. The policy manager will return
 	 * PM_STATE_SUSPEND_TO_RAM and then the PM subsystem will
 	 * suspend all devices. As gpio is wakeup capability is not
 	 * enabled, the device will be suspended.  This will be
-	 * confirmed in pm_power_state_set().
+	 * confirmed in pm_state_set().
 	 *
 	 * As the native posix implementation does not properly sleeps,
 	 * the idle thread will call several times the PM subsystem. This
@@ -107,11 +113,5 @@ void test_wakeup_device_system_pm(void)
 	k_sleep(K_SECONDS(1));
 }
 
-void test_main(void)
-{
-	ztest_test_suite(wakeup_device_test,
-			 ztest_1cpu_unit_test(test_wakeup_device_api),
-			 ztest_1cpu_unit_test(test_wakeup_device_system_pm)
-		);
-	ztest_run_test_suite(wakeup_device_test);
-}
+ZTEST_SUITE(wakeup_device_1cpu, NULL, NULL, ztest_simple_1cpu_before,
+			ztest_simple_1cpu_after, NULL);

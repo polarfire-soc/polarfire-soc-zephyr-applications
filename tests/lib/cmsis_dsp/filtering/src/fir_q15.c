@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <zephyr.h>
+#include <zephyr/ztest.h>
+#include <zephyr/kernel.h>
 #include <stdlib.h>
 #include <arm_math.h>
 #include "../../common/test_common.h"
@@ -16,7 +16,9 @@
 #define SNR_ERROR_THRESH	((float32_t)59)
 #define ABS_ERROR_THRESH_Q15	((q15_t)2)
 
-static void test_arm_fir_q15(void)
+#define COEFF_PADDING		(8)
+
+ZTEST(filtering_fir_q15, test_arm_fir_q15)
 {
 	size_t sample_index, block_index;
 	size_t block_size, tap_count;
@@ -28,6 +30,10 @@ static void test_arm_fir_q15(void)
 	const q15_t *ref = (const q15_t *)ref_val;
 	q15_t *state, *output_buf, *output;
 	arm_fir_instance_q15 inst;
+#if defined(CONFIG_ARMV8_1_M_MVEI) && defined(CONFIG_FPU)
+	q15_t coeff_padded[32];
+	int round;
+#endif
 
 	/* Allocate buffers */
 	state = malloc(3 * 41 * sizeof(q15_t));
@@ -44,10 +50,24 @@ static void test_arm_fir_q15(void)
 		block_size = config[0];
 		tap_count = config[1];
 
-		/* Initialise instance */
-		arm_fir_init_q15(&inst, tap_count, coeff, state, block_size);
+#if defined(CONFIG_ARMV8_1_M_MVEI) && defined(CONFIG_FPU)
+		/* Copy coefficients and pad to zero */
+		memset(coeff_padded, 127, sizeof(coeff_padded));
+		round = tap_count / COEFF_PADDING;
+		if ((round * COEFF_PADDING) < tap_count) {
+			round++;
+		}
+		round = round * COEFF_PADDING;
+		memset(coeff_padded, 0, round * sizeof(q15_t));
+		memcpy(coeff_padded, coeff, tap_count * sizeof(q15_t));
+#endif
 
-		/* TODO: Add MEVI support */
+		/* Initialise instance */
+#if defined(CONFIG_ARMV8_1_M_MVEI) && defined(CONFIG_FPU)
+		arm_fir_init_q15(&inst, tap_count, coeff_padded, state, block_size);
+#else
+		arm_fir_init_q15(&inst, tap_count, coeff, state, block_size);
+#endif
 
 		/* Reset input pointer */
 		input = (const q15_t *)in_val;
@@ -82,11 +102,4 @@ static void test_arm_fir_q15(void)
 	free(output_buf);
 }
 
-void test_filtering_fir_q15(void)
-{
-	ztest_test_suite(filtering_fir_q15,
-		ztest_unit_test(test_arm_fir_q15)
-		);
-
-	ztest_run_test_suite(filtering_fir_q15);
-}
+ZTEST_SUITE(filtering_fir_q15, NULL, NULL, NULL, NULL, NULL);

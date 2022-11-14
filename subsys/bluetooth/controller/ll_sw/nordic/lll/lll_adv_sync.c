@@ -8,6 +8,8 @@
 
 #include <soc.h>
 
+#include <zephyr/sys/byteorder.h>
+
 #include "hal/cpu.h"
 #include "hal/ccm.h"
 #include "hal/radio.h"
@@ -17,6 +19,7 @@
 #include "util/util.h"
 #include "util/mem.h"
 #include "util/memq.h"
+#include "util/dbuf.h"
 
 #include "pdu.h"
 
@@ -41,23 +44,13 @@
 #include "common/log.h"
 #include "hal/debug.h"
 
-#if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
-#define ADV_SYNC_PDU_B2B_AFS (CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK_AFS)
-#else
-#define ADV_SYNC_PDU_B2B_AFS 0
-#endif
-
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 static void isr_done(void *param);
-static void switch_radio_complete_and_phy_end_disable(const struct lll_adv_sync *lll);
 
 #if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
 static void isr_tx(void *param);
-static void pdu_b2b_update(struct lll_adv_sync *lll, struct pdu_adv *pdu, uint32_t cte_len_us);
-static void pdu_b2b_aux_ptr_update(struct pdu_adv *pdu, uint8_t phy, uint8_t flags,
-				   uint8_t chan_idx, uint32_t offset_us, uint32_t cte_len_us);
 static void switch_radio_complete_and_b2b_tx(const struct lll_adv_sync *lll, uint8_t phy_s);
 #endif /* CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK */
 
@@ -161,7 +154,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 	/* Start setting up of Radio h/w */
 	radio_reset();
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
-	radio_tx_power_set(lll->tx_pwr_lvl);
+	radio_tx_power_set(lll->adv->tx_pwr_lvl);
 #else
 	radio_tx_power_set(RADIO_TXP_DEFAULT);
 #endif
@@ -170,12 +163,11 @@ static int prepare_cb(struct lll_prepare_param *p)
 
 	/* TODO: if coded we use S8? */
 	radio_phy_set(phy_s, lll->adv->phy_flags);
-	radio_pkt_configure(8, PDU_AC_PAYLOAD_SIZE_MAX, (phy_s << 1));
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, PDU_AC_PAYLOAD_SIZE_MAX,
+			    RADIO_PKT_CONF_PHY(phy_s));
 	radio_aa_set(lll->access_addr);
-	radio_crc_configure(((0x5bUL) | ((0x06UL) << 8) | ((0x00UL) << 16)),
-			    (((uint32_t)lll->crc_init[2] << 16) |
-			     ((uint32_t)lll->crc_init[1] << 8) |
-			     ((uint32_t)lll->crc_init[0])));
+	radio_crc_configure(PDU_CRC_POLYNOMIAL,
+				sys_get_le24(lll->crc_init));
 	lll_chan_set(data_chan_use);
 
 	upd = 0U;
@@ -188,14 +180,6 @@ static int prepare_cb(struct lll_prepare_param *p)
 	cte_len_us = 0U;
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX) */
 
-#if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
-	if (upd) {
-		/* AuxPtr offsets for b2b TX are fixed for given chain so we can
-		 * calculate them here in advance.
-		 */
-		pdu_b2b_update(lll, pdu, cte_len_us);
-	}
-#endif
 	radio_pkt_tx_set(pdu);
 
 #if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
@@ -203,13 +187,13 @@ static int prepare_cb(struct lll_prepare_param *p)
 		lll->last_pdu = pdu;
 
 		radio_isr_set(isr_tx, lll);
-		radio_tmr_tifs_set(ADV_SYNC_PDU_B2B_AFS + cte_len_us);
+		radio_tmr_tifs_set(EVENT_SYNC_B2B_MAFS_US);
 		switch_radio_complete_and_b2b_tx(lll, phy_s);
 	} else
 #endif /* CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK */
 	{
 		radio_isr_set(isr_done, lll);
-		switch_radio_complete_and_phy_end_disable(lll);
+		radio_switch_complete_and_disable();
 	}
 
 	ticks_at_event = p->ticks_at_expire;
@@ -222,14 +206,34 @@ static int prepare_cb(struct lll_prepare_param *p)
 	remainder = p->remainder;
 	start_us = radio_tmr_start(1, ticks_at_start, remainder);
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR) || \
+	defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
+	/* capture end of AUX_SYNC_IND/AUX_CHAIN_IND PDU, used for calculating
+	 * next PDU timestamp.
+	 *
+	 * In Periodic Advertising without chaining there is no need for LLL to
+	 * get the end time from radio, hence there is no call to
+	 * radio_tmr_end_capture() to capture the radio end time.
+	 *
+	 * With chaining the sw_switch used PPI/DPPI for back to back Tx, no
+	 * radio end time capture is needed there either.
+	 *
+	 * For PA LNA (and ISR profiling), the radio end time is required to
+	 * setup the GPIOTE using radio_gpio_pa_lna_enable which needs call to
+	 * radio_tmr_tifs_base_get(), both PA/LNA and ISR profiling call
+	 * radio_tmr_end_get().
+	 */
+	radio_tmr_end_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 	radio_gpio_pa_setup();
 
 	radio_gpio_pa_lna_enable(start_us + radio_tx_ready_delay_get(phy_s, 1) -
-				 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#else /* !CONFIG_BT_CTLR_GPIO_PA_PIN */
+				 HAL_RADIO_GPIO_PA_OFFSET);
+#else /* !HAL_RADIO_GPIO_HAVE_PA_PIN */
 	ARG_UNUSED(start_us);
-#endif /* !CONFIG_BT_CTLR_GPIO_PA_PIN */
+#endif /* !HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
@@ -349,12 +353,12 @@ static void isr_tx(void *param)
 
 	/* setup tIFS switching */
 	if (pdu->adv_ext_ind.ext_hdr_len && pdu->adv_ext_ind.ext_hdr.aux_ptr) {
-		radio_tmr_tifs_set(ADV_SYNC_PDU_B2B_AFS + cte_len_us);
+		radio_tmr_tifs_set(EVENT_SYNC_B2B_MAFS_US);
 		radio_isr_set(isr_tx, lll_sync);
 		switch_radio_complete_and_b2b_tx(lll_sync, lll->phy_s);
 	} else {
-		radio_isr_set(isr_done, lll);
-		switch_radio_complete_and_phy_end_disable(lll_sync);
+		radio_isr_set(isr_done, lll_sync);
+		radio_switch_complete_and_disable();
 	}
 
 	radio_pkt_tx_set(pdu);
@@ -366,12 +370,15 @@ static void isr_tx(void *param)
 		lll_prof_cputime_capture();
 	}
 
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR) || \
+	defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 	/* capture end of AUX_SYNC_IND/AUX_CHAIN_IND PDU, used for calculating
 	 * next PDU timestamp.
 	 */
 	radio_tmr_end_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		/* PA/LNA enable is overwriting packet end used in ISR
 		 * profiling, hence back it up for later use.
@@ -379,77 +386,21 @@ static void isr_tx(void *param)
 		lll_prof_radio_end_backup();
 	}
 
-	radio_gpio_lna_setup();
-	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + ADV_SYNC_PDU_B2B_AFS - 4 + cte_len_us -
+	radio_gpio_pa_setup();
+	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() +
+				 EVENT_SYNC_B2B_MAFS_US -
+				 (EVENT_CLOCK_JITTER_US << 1) + cte_len_us -
 				 radio_tx_chain_delay_get(lll->phy_s, 0) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_PA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		lll_prof_send();
 	}
 }
 
-static void pdu_b2b_update(struct lll_adv_sync *lll, struct pdu_adv *pdu, uint32_t cte_len_us)
-{
-	while (pdu) {
-		/* FIXME: Use implementation defined channel index */
-		pdu_b2b_aux_ptr_update(pdu, lll->adv->phy_s, lll->adv->phy_flags, 0,
-				       ADV_SYNC_PDU_B2B_AFS, cte_len_us);
-		pdu = lll_adv_pdu_linked_next_get(pdu);
-	}
-}
-
-static void pdu_b2b_aux_ptr_update(struct pdu_adv *pdu, uint8_t phy, uint8_t flags,
-				   uint8_t chan_idx, uint32_t offset_us, uint32_t cte_len_us)
-{
-	struct pdu_adv_com_ext_adv *com_hdr;
-	struct pdu_adv_aux_ptr *aux_ptr;
-	struct pdu_adv_ext_hdr *hdr;
-	uint8_t *dptr;
-
-	com_hdr = &pdu->adv_ext_ind;
-	hdr = &com_hdr->ext_hdr;
-	/* Skip flags */
-	dptr = hdr->data;
-
-	if (!com_hdr->ext_hdr_len || !hdr->aux_ptr) {
-		return;
-	}
-
-	LL_ASSERT(!hdr->adv_addr);
-	LL_ASSERT(!hdr->tgt_addr);
-
-	if (hdr->cte_info) {
-		dptr++;
-	}
-
-	LL_ASSERT(!hdr->adi);
-
-	/* Update AuxPtr */
-	aux_ptr = (void *)dptr;
-	offset_us += PDU_AC_US(pdu->len, phy, flags);
-	/* Add CTE length to PDUs that have CTE attached.
-	 * Periodic advertising chain may include PDUs without CTE.
-	 */
-	if (hdr->cte_info) {
-		offset_us += cte_len_us;
-	}
-	offset_us = offset_us / OFFS_UNIT_30_US;
-	if ((offset_us >> 13) != 0) {
-		aux_ptr->offs = offset_us / (OFFS_UNIT_300_US / OFFS_UNIT_30_US);
-		aux_ptr->offs_units = OFFS_UNIT_VALUE_300_US;
-	} else {
-		aux_ptr->offs = offset_us;
-		aux_ptr->offs_units = OFFS_UNIT_VALUE_30_US;
-	}
-	aux_ptr->chan_idx = chan_idx;
-	aux_ptr->ca = (lll_clock_ppm_local_get() <= SCA_50_PPM) ?
-		      SCA_VALUE_50_PPM : SCA_VALUE_500_PPM;
-	aux_ptr->phy = find_lsb_set(phy) - 1;
-}
-
-static void switch_radio_complete_and_b2b_tx(const struct lll_adv_sync *lll, uint8_t phy_s)
+static void switch_radio_complete_and_b2b_tx(const struct lll_adv_sync *lll,
+					     uint8_t phy_s)
 {
 #if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
 	if (lll->cte_started) {
@@ -461,15 +412,3 @@ static void switch_radio_complete_and_b2b_tx(const struct lll_adv_sync *lll, uin
 	}
 }
 #endif /* CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK */
-
-static void switch_radio_complete_and_phy_end_disable(const struct lll_adv_sync *lll)
-{
-#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
-	if (lll->cte_started) {
-		radio_switch_complete_and_phy_end_disable();
-	} else
-#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
-	{
-		radio_switch_complete_and_disable();
-	}
-}

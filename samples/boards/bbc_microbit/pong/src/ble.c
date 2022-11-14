@@ -4,19 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <sys/printk.h>
-#include <drivers/gpio.h>
-#include <device.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/device.h>
 #include <string.h>
 
-#include <display/mb_display.h>
+#include <zephyr/display/mb_display.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/gatt.h>
-#include <bluetooth/hci.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/hci.h>
 
 
 #include "pong.h"
@@ -487,8 +487,8 @@ static void ble_timeout(struct k_work *work)
 	case BLE_CONNECTED:
 		discov_param.uuid = &pong_svc_uuid.uuid;
 		discov_param.func = discover_func;
-		discov_param.start_handle = BT_ATT_FIRST_ATTTRIBUTE_HANDLE;
-		discov_param.end_handle = BT_ATT_LAST_ATTTRIBUTE_HANDLE;
+		discov_param.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
+		discov_param.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 		discov_param.type = BT_GATT_DISCOVER_PRIMARY;
 
 		err = bt_gatt_discover(default_conn, &discov_param);

@@ -5,6 +5,7 @@ zephyr_library_sources(
   util/mem.c
   util/memq.c
   util/mayfly.c
+  util/dbuf.c
   util/util.c
   ticker/ticker.c
   ll_sw/ll_addr.c
@@ -23,10 +24,6 @@ if(CONFIG_BT_LL_SW_SPLIT)
     message(WARNING "\nCONFIG_BT_CTLR_ADVANCED_FEATURES=y, Advanced Features' "
 		    "default value change could change Zephyr Bluetooth "
 		    "Controller's functional behavior.")
-  endif()
-  if(CONFIG_BT_CTLR_ADV_EXT)
-    message(WARNING "\nCONFIG_BT_CTLR_ADV_EXT=y, Advertising Extensions "
-		    "Feature in Zephyr Bluetooth Controller is EXPERIMENTAL.")
   endif()
   zephyr_library_sources(
     ll_sw/ll_feat.c
@@ -71,6 +68,33 @@ if(CONFIG_BT_LL_SW_SPLIT)
     zephyr_library_sources(
       ll_sw/ull_conn.c
       )
+    if(CONFIG_BT_LL_SW_LLCP_LEGACY)
+    else()
+      zephyr_library_sources_ifdef(
+        CONFIG_BT_CTLR_PHY
+        ll_sw/ull_llcp_phy.c
+        )
+      zephyr_library_sources_ifdef(
+        CONFIG_BT_CTLR_LE_ENC
+        ll_sw/ull_llcp_enc.c
+        )
+      if (CONFIG_BT_CTLR_PERIPHERAL_ISO OR
+          CONFIG_BT_CTLR_CENTRAL_ISO)
+        zephyr_library_sources(
+          ll_sw/ull_llcp_cc.c
+        )
+	  endif()
+      zephyr_library_sources(
+        ll_sw/ull_tx_queue.c
+        ll_sw/ull_llcp.c
+        ll_sw/ull_llcp_common.c
+        ll_sw/ull_llcp_local.c
+        ll_sw/ull_llcp_pdu.c
+        ll_sw/ull_llcp_conn_upd.c
+        ll_sw/ull_llcp_chmu.c
+        ll_sw/ull_llcp_remote.c
+        )
+    endif()
     if(CONFIG_BT_PERIPHERAL)
       zephyr_library_sources(
         ll_sw/ull_peripheral.c
@@ -89,11 +113,11 @@ if(CONFIG_BT_LL_SW_SPLIT)
         ll_sw/ull_central_iso.c
       )
     endif()
-    if(CONFIG_BT_CTLR_SCHED_ADVANCED)
-      zephyr_library_sources(
-        ll_sw/ull_sched.c
-      )
-    endif()
+  endif()
+  if(CONFIG_BT_CTLR_SCHED_ADVANCED)
+    zephyr_library_sources(
+      ll_sw/ull_sched.c
+    )
   endif()
   if(CONFIG_BT_CTLR_DF)
     zephyr_library_sources(

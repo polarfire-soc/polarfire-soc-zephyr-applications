@@ -4,9 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-zephyr_library()
-zephyr_library_sources(pinmux.c)
-
 if(DEFINED ENV{EVERGLADES_SPI_GEN})
   # Grab it from environment variable if defined
   set(EVERGLADES_SPI_GEN $ENV{EVERGLADES_SPI_GEN})
@@ -24,7 +21,7 @@ else()
     set(EVERGLADES_SPI_GEN_FILENAME everglades_spi_gen.exe)
   endif()
 
-  find_file(EVERGLADES_SPI_GEN_FINDFILE ${EVERGLADES_SPI_GEN_FILENAME} NO_DEFAULT_PATH)
+  find_file(EVERGLADES_SPI_GEN_FINDFILE ${EVERGLADES_SPI_GEN_FILENAME})
   if(EVERGLADES_SPI_GEN_FINDFILE STREQUAL EVERGLADES_SPI_GEN_FINDFILE-NOTFOUND)
     message(WARNING "Microchip SPI Image Generation tool (${EVERGLADES_SPI_GEN_FILENAME}) is not available. SPI Image will not be generated.")
   else()

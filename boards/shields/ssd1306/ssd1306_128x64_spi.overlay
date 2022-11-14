@@ -4,13 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/ {
+	chosen {
+		zephyr,display = &ssd1306_ssd1306_128x64_spi;
+	};
+};
+
 &arduino_spi {
 	status = "okay";
 
-	ssd1306@0 {
+	ssd1306_ssd1306_128x64_spi: ssd1306@0 {
 		compatible = "solomon,ssd1306fb";
 		reg = <0x0>;
-		label = "SSD1306";
 		spi-max-frequency = <10000000>;
 		width = <128>;
 		height = <64>;

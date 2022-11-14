@@ -6,18 +6,19 @@
 
 #define DT_DRV_COMPAT solomon_ssd1306fb
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ssd1306, CONFIG_DISPLAY_LOG_LEVEL);
 
 #include <string.h>
-#include <device.h>
-#include <init.h>
-#include <drivers/gpio.h>
-#include <drivers/i2c.h>
-#include <drivers/spi.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/kernel.h>
 
 #include "ssd1306_regs.h"
-#include <display/cfb.h>
+#include <zephyr/display/cfb.h>
 
 #if DT_INST_PROP(0, segment_remap) == 1
 #define SSD1306_PANEL_SEGMENT_REMAP	true
@@ -430,8 +431,7 @@ static const struct ssd1306_config ssd1306_config = {
 	.bus = I2C_DT_SPEC_INST_GET(0),
 #elif DT_INST_ON_BUS(0, spi)
 	.bus = SPI_DT_SPEC_INST_GET(
-		0, SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB |
-		SPI_WORD_SET(8) | SPI_LINES_SINGLE, 0),
+		0, SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB | SPI_WORD_SET(8), 0),
 	.data_cmd = GPIO_DT_SPEC_INST_GET(0, data_cmd_gpios),
 #endif
 	.reset = GPIO_DT_SPEC_INST_GET_OR(0, reset_gpios, { 0 })

@@ -5,6 +5,8 @@
 
 menuconfig FLASH_SIMULATOR
 	bool "Flash simulator"
+	default y
+	depends on DT_HAS_ZEPHYR_SIM_FLASH_ENABLED
 	select FLASH_HAS_PAGE_LAYOUT
 	select FLASH_HAS_DRIVER_ENABLED
 	help
@@ -27,7 +29,7 @@ config FLASH_SIMULATOR_DOUBLE_WRITES
 	 Keep in mind that write operations can only pull bits to zero, regardless.
 
 config FLASH_SIMULATOR_SIMULATE_TIMING
-	bool "Enable hardware timing simulation"
+	bool "Hardware timing simulation"
 
 if FLASH_SIMULATOR_SIMULATE_TIMING
 

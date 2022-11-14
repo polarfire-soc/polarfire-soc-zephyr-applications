@@ -12,11 +12,11 @@
 #define LOG_MODULE_NAME net_ipso_timer
 #define LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <stdint.h>
-#include <init.h>
+#include <zephyr/init.h>
 
 #include "lwm2m_object.h"
 #include "lwm2m_engine.h"
@@ -255,7 +255,8 @@ static int trigger_counter_post_write_cb(uint16_t obj_inst_id,
 
 static void timer_work_cb(struct k_work *work)
 {
-	struct ipso_timer_data *timer = CONTAINER_OF(work,
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct ipso_timer_data *timer = CONTAINER_OF(dwork,
 						     struct ipso_timer_data,
 						     timer_work);
 	stop_timer(timer, false);
@@ -274,7 +275,7 @@ static int timer_trigger_cb(uint16_t obj_inst_id,
 	return start_timer(&timer_data[i]);
 }
 
-static struct lwm2m_engine_obj_inst *timer_create(uint16_t obj_inst_id)
+static struct lwm2m_engine_obj_inst *timer_inst_create(uint16_t obj_inst_id)
 {
 	int index, avail = -1, i = 0, j = 0;
 
@@ -361,7 +362,7 @@ static int ipso_timer_init(const struct device *dev)
 	timer.fields = fields;
 	timer.field_count = ARRAY_SIZE(fields);
 	timer.max_instance_count = MAX_INSTANCE_COUNT;
-	timer.create_cb = timer_create;
+	timer.create_cb = timer_inst_create;
 	lwm2m_register_obj(&timer);
 
 	return 0;

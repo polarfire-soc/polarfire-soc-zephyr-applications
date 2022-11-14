@@ -3,15 +3,15 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <ztest.h>
-#include <posix/time.h>
-#include <posix/sys/time.h>
-#include <posix/unistd.h>
+#include <zephyr/ztest.h>
+#include <zephyr/posix/time.h>
+#include <zephyr/posix/sys/time.h>
+#include <zephyr/posix/unistd.h>
 
 #define SLEEP_SECONDS 1
 #define CLOCK_INVALID -1
 
-void test_posix_clock(void)
+ZTEST(posix_apis, test_posix_clock)
 {
 	int64_t nsecs_elapsed, secs_elapsed;
 	struct timespec ts, te;
@@ -21,7 +21,7 @@ void test_posix_clock(void)
 	/* TESTPOINT: Pass invalid clock type */
 	zassert_equal(clock_gettime(CLOCK_INVALID, &ts), -1,
 			NULL);
-	zassert_equal(errno, EINVAL, NULL);
+	zassert_equal(errno, EINVAL);
 
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	/* 2 Sec Delay */
@@ -44,7 +44,7 @@ void test_posix_clock(void)
 	printk("POSIX clock APIs test done\n");
 }
 
-void test_posix_realtime(void)
+ZTEST(posix_apis, test_posix_realtime)
 {
 	int ret;
 	struct timespec rts, mts;
@@ -66,7 +66,7 @@ void test_posix_realtime(void)
 	/* TESTPOINT: Pass invalid clock type */
 	zassert_equal(clock_settime(CLOCK_INVALID, &nts), -1,
 			NULL);
-	zassert_equal(errno, EINVAL, NULL);
+	zassert_equal(errno, EINVAL);
 
 	ret = clock_settime(CLOCK_MONOTONIC, &nts);
 	zassert_not_equal(ret, 0, "Should not be able to set monotonic time");
@@ -84,7 +84,7 @@ void test_posix_realtime(void)
 	for (int i = 1; i <= 20; i++) {
 		usleep(USEC_PER_MSEC * 90U);
 		ret = clock_gettime(CLOCK_REALTIME, &rts);
-		zassert_equal(ret, 0, "Fail to read realitime clock");
+		zassert_equal(ret, 0, "Fail to read realtime clock");
 
 		int64_t delta =
 			((int64_t)rts.tv_sec * NSEC_PER_SEC -
@@ -110,10 +110,10 @@ void test_posix_realtime(void)
 
 	/* Validate gettimeofday API */
 	ret = gettimeofday(&tv, NULL);
-	zassert_equal(ret, 0, NULL);
+	zassert_equal(ret, 0);
 
 	ret = clock_gettime(CLOCK_REALTIME, &rts);
-	zassert_equal(ret, 0, NULL);
+	zassert_equal(ret, 0);
 
 	/* TESTPOINT: Check if time obtained from
 	 * gettimeofday is same or more than obtained

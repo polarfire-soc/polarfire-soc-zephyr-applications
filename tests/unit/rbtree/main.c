@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <ztest.h>
-#include <sys/rb.h>
+#include <zephyr/ztest.h>
+#include <zephyr/sys/rb.h>
 
 #include "../../../lib/os/rb.c"
 
@@ -20,7 +20,7 @@ static struct rbnode nodes[MAX_NODES];
 /* Bit is set if node is in the tree */
 static unsigned int node_mask[(MAX_NODES + 31)/32];
 
-/* Array of nodes dumed via rb_walk */
+/* Array of nodes dumped via rb_walk */
 static struct rbnode *walked_nodes[MAX_NODES];
 
 /* Node currently being inserted, for testing lessthan() argument order */
@@ -228,7 +228,7 @@ void test_tree(int size)
 	}
 }
 
-void test_rbtree_spam(void)
+ZTEST(rbtree_api, test_rbtree_spam)
 {
 	int size = 1;
 
@@ -255,7 +255,7 @@ void test_rbtree_spam(void)
  *
  * @see rb_get_min(), rb_get_max()
  */
-void test_rb_get_minmax(void)
+ZTEST(rbtree_api, test_rb_get_minmax)
 {
 	struct rbnode temp = {0};
 
@@ -277,11 +277,4 @@ void test_rb_get_minmax(void)
 	zassert_true(rb_get_max(&tree) == &nodes[7], "the tree is invalid");
 }
 
-void test_main(void)
-{
-	ztest_test_suite(test_rbtree,
-			 ztest_unit_test(test_rbtree_spam),
-			 ztest_unit_test(test_rb_get_minmax)
-			 );
-	ztest_run_test_suite(test_rbtree);
-}
+ZTEST_SUITE(rbtree_api, NULL, NULL, NULL, NULL, NULL);

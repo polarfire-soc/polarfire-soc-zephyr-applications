@@ -1,15 +1,14 @@
-.. _mpfs250t-miv:
+.. _mpfs_icicle:
 
-Microsemi MPFS250T Mi-V
-######################
+Microchip mpfs_icicle
+#####################
 
 Overview
 ********
 
-The Microsemi MPFS250T board is an PolarFire SoC FPGA based development board.
-The E51 RISC-V CPU can be deployed on the ICICLE board.
-More information can be found on
-`Microsemi's website <https://www.microsemi.com/product-directory/embedded-processing/4406-cpus>`_.
+The Microchip mpfs_icicle board is a PolarFire SoC FPGA based development board with a Microchip MPFS250T fpga device.
+The E51 RISC-V CPU can be deployed on the mpfs_icicle board.
+More information can be found on the `Microchip website <https://www.microchip.com/en-us/product/MPFS250T>`_.
 
 Programming and debugging
 *************************
@@ -17,19 +16,13 @@ Programming and debugging
 Building
 ========
 
-Applications for the ``mpfs250t`` board configuration can be built as usual
+Applications for the ``mpfs_icicle`` board configuration can be built as usual
 (see :ref:`build_an_application`):
 
 .. zephyr-app-commands::
-   :board: mpfs250t
+   :board: mpfs_icicle
    :goals: build
 
-By default the application is located in LIM at address 0x08000000. To locate
-the application in DDR at address 0x80000000, append the following to the 
-build command line:
-
- -- -DDTC_OVERLAY_FILE=~/zephyrproject/zephyr/boards/riscv/mpfs250t/mpfs250t-ddr.overlay
- 
 
 Flashing
 ========
@@ -38,8 +31,8 @@ In order to upload the application to the device, you'll need OpenOCD and GDB
 with RISC-V support.
 You can get them as a part of SoftConsole SDK.
 Download and installation instructions can be found on
-`Microsemi's SoftConsole website
-<https://www.microsemi.com/product-directory/design-tools/4879-softconsole>`_.
+`Microchip's SoftConsole website
+<https://www.microchip.com/en-us/products/fpgas-and-plds/fpga-and-soc-design-tools/programming-and-debug/softconsole>`_.
 
 With the necessary tools installed, you can connect to the board using OpenOCD.
 To establish an OpenOCD connection run:
@@ -63,7 +56,7 @@ and load the binary:
    <softconsole_path>/riscv-unknown-elf-gcc/bin/riscv64-unknown-elf-gdb \
    -ex "target extended-remote localhost:3333" \
    -ex "set mem inaccessible-by-default off" \
-   -ex "set arch riscv:rv32" \
+   -ex "set arch riscv:rv64" \
    -ex "set riscv use_compressed_breakpoints no" \
    -ex "load" <path_to_executable>
 

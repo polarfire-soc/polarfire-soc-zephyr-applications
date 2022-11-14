@@ -7,13 +7,13 @@
 #define DT_DRV_COMPAT microchip_xec_pcr
 
 #include <soc.h>
-#include <arch/cpu.h>
-#include <arch/arm/aarch32/cortex_m/cmsis.h>
-#include <drivers/clock_control.h>
-#include <drivers/clock_control/mchp_xec_clock_control.h>
-#include <dt-bindings/clock/mchp_xec_pcr.h>
-
-#include <logging/log.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/arch/arm/aarch32/cortex_m/cmsis.h>
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/drivers/clock_control/mchp_xec_clock_control.h>
+#include <zephyr/dt-bindings/clock/mchp_xec_pcr.h>
+#include <zephyr/irq.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(clock_control_xec, LOG_LEVEL_ERR);
 
 #define CLK32K_SIL_OSC_DELAY		256
@@ -328,7 +328,7 @@ static int pll_wait_lock(struct pcr_regs *const pcr, uint32_t wait_cnt)
  *     goes off.
  * At chip reset the PLL is held in reset and the +/- 50% ring oscillator is
  * the main clock.
- * If no VBAT reset occurs the VBAT 32 KHz soure register maintains its state.
+ * If no VBAT reset occurs the VBAT 32 KHz source register maintains its state.
  */
 static int soc_clk32_init(const struct device *dev,
 			  enum clk32k_src pll_clk_src,
@@ -559,11 +559,19 @@ static int xec_clock_control_get_subsys_rate(const struct device *dev,
 	switch (bus) {
 	case MCHP_XEC_PCR_CLK_CORE:
 	case MCHP_XEC_PCR_CLK_PERIPH_FAST:
-		*rate = MHZ(96);
+		if (pcr->TURBO_CLK & MCHP_PCR_TURBO_CLK_96M) {
+			*rate = MHZ(96);
+		} else {
+			*rate = MHZ(48);
+		}
 		break;
 	case MCHP_XEC_PCR_CLK_CPU:
 		/* if PCR PROC_CLK_CTRL is 0 the chip is not running */
-		*rate = MHZ(96) / pcr->PROC_CLK_CTRL;
+		if (pcr->TURBO_CLK & MCHP_PCR_TURBO_CLK_96M) {
+			*rate = MHZ(96) / pcr->PROC_CLK_CTRL;
+		} else {
+			*rate = MHZ(48) / pcr->PROC_CLK_CTRL;
+		}
 		break;
 	case MCHP_XEC_PCR_CLK_BUS:
 	case MCHP_XEC_PCR_CLK_PERIPH:

@@ -43,9 +43,7 @@ Key Features
 - USB OTG full speed or device only
 
 .. image:: img/nucleo_h723zg.jpg
-   :width: 720px
    :align: center
-   :height: 560px
    :alt: Nucleo H723ZG
 
 More information about the board can be found at the `Nucleo H723ZG website`_.
@@ -107,6 +105,8 @@ features:
 +-------------+------------+-------------------------------------+
 | I2C         | on-chip    | i2c                                 |
 +-------------+------------+-------------------------------------+
+| SPI         | on-chip    | spi                                 |
++-------------+------------+-------------------------------------+
 | PWM         | on-chip    | pwm                                 |
 +-------------+------------+-------------------------------------+
 | ETHERNET    | on-chip    | ethernet                            |
@@ -135,6 +135,7 @@ and a ST morpho connector. Board is configured as follows:
 - LD2 : PB7
 - LD3 : PB14
 - I2C : PB8, PB9
+- SPI1 NSS/SCK/MISO/MOSI : PD14PA5/PA6/PB5 (Arduino SPI)
 
 System Clock
 ------------

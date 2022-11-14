@@ -7,14 +7,13 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <errno.h>
-#include <zephyr.h>
-#include <sys/printk.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/direction.h>
-#include <sys/byteorder.h>
-#include <sys/util.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/direction.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/util.h>
 
 /* Length of CTE in unit of 8[us] */
 #define CTE_LEN (0x14U)
@@ -32,6 +31,7 @@ static struct bt_le_ext_adv *adv_set;
 
 static struct bt_le_adv_param param =
 		BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_EXT_ADV |
+				     BT_LE_ADV_OPT_USE_IDENTITY |
 				     BT_LE_ADV_OPT_USE_NAME,
 				     BT_GAP_ADV_FAST_INT_MIN_2,
 				     BT_GAP_ADV_FAST_INT_MAX_2,
@@ -48,21 +48,21 @@ static struct bt_le_per_adv_param per_adv_param = {
 	.options = BT_LE_ADV_OPT_USE_TX_POWER,
 };
 
-#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_TX)
+#if defined(CONFIG_BT_DF_CTE_TX_AOD)
 static uint8_t ant_patterns[] = {0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA };
-#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_TX */
+#endif /* CONFIG_BT_DF_CTE_TX_AOD */
 
 struct bt_df_adv_cte_tx_param cte_params = { .cte_len = CTE_LEN,
 					     .cte_count = PER_ADV_EVENT_CTE_COUNT,
-#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_TX)
-					     .cte_type = BT_HCI_LE_AOD_CTE_2US,
+#if defined(CONFIG_BT_DF_CTE_TX_AOD)
+					     .cte_type = BT_DF_CTE_TYPE_AOD_2US,
 					     .num_ant_ids = ARRAY_SIZE(ant_patterns),
 					     .ant_ids = ant_patterns
 #else
-					     .cte_type = BT_HCI_LE_AOA_CTE,
+					     .cte_type = BT_DF_CTE_TYPE_AOA,
 					     .num_ant_ids = 0,
 					     .ant_ids = NULL
-#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_TX */
+#endif /* CONFIG_BT_DF_CTE_TX_AOD */
 };
 
 static void adv_sent_cb(struct bt_le_ext_adv *adv,
@@ -137,7 +137,14 @@ void main(void)
 	}
 	printk("success\n");
 
-	bt_le_ext_adv_oob_get_local(adv_set, &oob_local);
+	printk("Get extended advertising address...");
+	err = bt_le_ext_adv_oob_get_local(adv_set, &oob_local);
+	if (err) {
+		printk("failed (err %d)\n", err);
+		return;
+	}
+	printk("success\n");
+
 	bt_addr_le_to_str(&oob_local.addr, addr_s, sizeof(addr_s));
 
 	printk("Started extended advertising as %s\n", addr_s);

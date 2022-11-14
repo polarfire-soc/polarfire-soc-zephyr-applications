@@ -14,11 +14,11 @@
 #define LOG_MODULE_NAME net_ipso_temp_sensor
 #define LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <stdint.h>
-#include <init.h>
+#include <zephyr/init.h>
 
 #include "lwm2m_object.h"
 #include "lwm2m_engine.h"
@@ -79,14 +79,14 @@ static struct lwm2m_engine_res_inst
 static void update_min_measured(uint16_t obj_inst_id, int index)
 {
 	min_measured_value[index] = sensor_value[index];
-	NOTIFY_OBSERVER(IPSO_OBJECT_TEMP_SENSOR_ID, obj_inst_id,
+	lwm2m_notify_observer(IPSO_OBJECT_TEMP_SENSOR_ID, obj_inst_id,
 			MIN_MEASURED_VALUE_RID);
 }
 
 static void update_max_measured(uint16_t obj_inst_id, int index)
 {
 	max_measured_value[index] = sensor_value[index];
-	NOTIFY_OBSERVER(IPSO_OBJECT_TEMP_SENSOR_ID, obj_inst_id,
+	lwm2m_notify_observer(IPSO_OBJECT_TEMP_SENSOR_ID, obj_inst_id,
 			MAX_MEASURED_VALUE_RID);
 }
 

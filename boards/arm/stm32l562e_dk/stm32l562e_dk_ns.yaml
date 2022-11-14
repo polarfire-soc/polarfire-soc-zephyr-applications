@@ -8,10 +8,10 @@ toolchain:
 supported:
   - gpio
   - i2c
-  - lsm6dso
   - lptim
   - dac
   - spi
   - arduino_spi
+  - sdhc
 ram: 192
 flash: 512

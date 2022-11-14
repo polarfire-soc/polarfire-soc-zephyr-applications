@@ -4,18 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <stddef.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
-#include <sys/byteorder.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/sys/byteorder.h>
 #include <host/hci_core.h>
 
 #include "util/util.h"
 #include "util/memq.h"
 #include "util/mem.h"
+#include "util/dbuf.h"
 
 #include "pdu.h"
 
@@ -76,7 +77,9 @@ struct ll_adv_set *common_create_adv_set(uint8_t hci_handle)
 	 */
 	lll_sync = &g_sync_set.lll;
 	adv_set->lll.sync = &g_sync_set.lll;
+	lll_hdr_init(&adv_set->lll, adv_set);
 	g_sync_set.lll.adv = &adv_set->lll;
+	lll_hdr_init(lll_sync, &g_sync_set);
 
 	err = lll_adv_init();
 	zassert_equal(err, 0, "Unexpected error while initialization advertising set, err: %d",
@@ -133,15 +136,18 @@ void common_release_adv_set(struct ll_adv_set *adv_set)
  */
 void common_create_per_adv_chain(struct ll_adv_set *adv_set, uint8_t pdu_count)
 {
+	uint8_t hdr_data[ULL_ADV_HDR_DATA_LEN_SIZE +
+			 ULL_ADV_HDR_DATA_AUX_PTR_PTR_SIZE];
 	struct pdu_adv *pdu_prev, *pdu, *pdu_new;
 	char pdu_buff[PDU_PAULOAD_BUFF_SIZE];
 	void *extra_data_prev, *extra_data;
 	struct lll_adv_sync *lll_sync;
+	bool adi_in_sync_ind;
 	uint8_t err, pdu_idx;
 
 	lll_sync = adv_set->lll.sync;
 	pdu = lll_adv_sync_data_peek(lll_sync, NULL);
-	ull_adv_sync_pdu_init(pdu, 0);
+	ull_adv_sync_pdu_init(pdu, 0U, 0U, 0U, NULL);
 
 	err = ull_adv_sync_pdu_alloc(adv_set, ULL_ADV_PDU_EXTRA_DATA_ALLOC_IF_EXIST, &pdu_prev,
 				     &pdu, &extra_data_prev, &extra_data, &pdu_idx);
@@ -153,10 +159,15 @@ void common_create_per_adv_chain(struct ll_adv_set *adv_set, uint8_t pdu_count)
 
 	/* Create AUX_SYNC_IND PDU as a head of chain */
 	err = ull_adv_sync_pdu_set_clear(lll_sync, pdu_prev, pdu,
-					 (pdu_count > 1 ? ULL_ADV_PDU_HDR_FIELD_AUX_PTR : 0), 0,
-					 NULL);
+					 (pdu_count > 1 ? ULL_ADV_PDU_HDR_FIELD_AUX_PTR :
+								ULL_ADV_PDU_HDR_FIELD_NONE),
+					 ULL_ADV_PDU_HDR_FIELD_NONE, hdr_data);
 	zassert_equal(err, 0, "Unexpected error during initialization of extended PDU, err: %d",
 		      err);
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT)) {
+		adi_in_sync_ind = ull_adv_sync_pdu_had_adi(pdu);
+	}
 
 	/* Add some AD for testing */
 	snprintf(pdu_buff, ARRAY_SIZE(pdu_buff), "test%" PRIu8 " test%" PRIu8 " test%" PRIu8 "", 0,
@@ -171,9 +182,30 @@ void common_create_per_adv_chain(struct ll_adv_set *adv_set, uint8_t pdu_count)
 		zassert_not_null(pdu_new, "Cannot allocate new PDU.");
 		/* Initialize new empty PDU. Last AUX_CHAIN_IND may not include AuxPtr. */
 		if (idx < pdu_count - 1) {
-			ull_adv_sync_pdu_init(pdu_new, ULL_ADV_PDU_HDR_FIELD_AUX_PTR);
+			if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) &&
+			    adi_in_sync_ind) {
+				ull_adv_sync_pdu_init(pdu_new,
+						ULL_ADV_PDU_HDR_FIELD_AUX_PTR |
+						ULL_ADV_PDU_HDR_FIELD_ADI,
+						lll_sync->adv->phy_s,
+						lll_sync->adv->phy_flags, NULL);
+			} else {
+				ull_adv_sync_pdu_init(pdu_new,
+						ULL_ADV_PDU_HDR_FIELD_AUX_PTR,
+						lll_sync->adv->phy_s,
+						lll_sync->adv->phy_flags, NULL);
+			}
 		} else {
-			ull_adv_sync_pdu_init(pdu_new, 0);
+			if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) &&
+			    adi_in_sync_ind) {
+				ull_adv_sync_pdu_init(pdu_new,
+						ULL_ADV_PDU_HDR_FIELD_ADI,
+						0U, 0U, NULL);
+			} else {
+				ull_adv_sync_pdu_init(pdu_new,
+						ULL_ADV_PDU_HDR_FIELD_NONE,
+						0U, 0U, NULL);
+			}
 		}
 		/* Add some AD for testing */
 		common_pdu_adv_data_set(pdu_new, pdu_buff, strlen(pdu_buff));
@@ -246,14 +278,6 @@ void common_validate_per_adv_pdu(struct pdu_adv *pdu, enum test_pdu_ext_adv_type
 				      "Unexpected AdvA field in extended advertising header");
 			zassert_false(ext_hdr->tgt_addr,
 				      "Unexpected TargetA field in extended advertising header");
-			if (type == TEST_PDU_EXT_ADV_SYNC_IND) {
-				zassert_false(
-					ext_hdr->adi,
-					"Unexpected ADI field in extended advertising header");
-			}
-			zassert_false(ext_hdr->sync_info,
-				      "Unexpected SyncInfo field in extended advertising header");
-
 			if (exp_ext_hdr_flags & ULL_ADV_PDU_HDR_FIELD_CTE_INFO) {
 				zassert_true(
 					ext_hdr->cte_info,
@@ -264,8 +288,7 @@ void common_validate_per_adv_pdu(struct pdu_adv *pdu, enum test_pdu_ext_adv_type
 					ext_hdr->cte_info,
 					"Unexpected CteInfo field in extended advertising header");
 			}
-			if (type == TEST_PDU_EXT_ADV_SYNC_IND &&
-			    (exp_ext_hdr_flags & ULL_ADV_PDU_HDR_FIELD_ADI)) {
+			if (exp_ext_hdr_flags & ULL_ADV_PDU_HDR_FIELD_ADI) {
 				zassert_true(
 					ext_hdr->adi,
 					"Missing expected ADI field in extended advertising header");
@@ -285,6 +308,8 @@ void common_validate_per_adv_pdu(struct pdu_adv *pdu, enum test_pdu_ext_adv_type
 					ext_hdr->aux_ptr,
 					"Unexpected AuxPtr field in extended advertising header");
 			}
+			zassert_false(ext_hdr->sync_info,
+				      "Unexpected SyncInfo field in extended advertising header");
 			if (exp_ext_hdr_flags & ULL_ADV_PDU_HDR_FIELD_TX_POWER) {
 				zassert_true(
 					ext_hdr->tx_pwr,
@@ -322,7 +347,7 @@ void common_validate_per_adv_pdu(struct pdu_adv *pdu, enum test_pdu_ext_adv_type
 }
 
 /*
- * @brief Helper function to prepre CTE configuration for a given advertising set.
+ * @brief Helper function to prepare CTE configuration for a given advertising set.
  *
  * Note: There is a single instance of CTE configuration. In case there is a need
  * to use multiple advertising sets at once, all will use the same CTE configuration.
@@ -361,6 +386,7 @@ void common_validate_per_adv_chain(struct ll_adv_set *adv, uint8_t pdu_count)
 	} else {
 		ext_hdr_flags = ULL_ADV_PDU_HDR_FIELD_AD_DATA;
 	}
+
 	common_validate_per_adv_pdu(pdu, TEST_PDU_EXT_ADV_SYNC_IND, ext_hdr_flags);
 	pdu = lll_adv_pdu_linked_next_get(pdu);
 	if (pdu_count > 1) {
@@ -378,6 +404,7 @@ void common_validate_per_adv_chain(struct ll_adv_set *adv, uint8_t pdu_count)
 		} else {
 			ext_hdr_flags = ULL_ADV_PDU_HDR_FIELD_AD_DATA;
 		}
+
 		common_validate_per_adv_pdu(pdu, TEST_PDU_EXT_ADV_CHAIN_IND, ext_hdr_flags);
 		pdu = lll_adv_pdu_linked_next_get(pdu);
 		if (idx != (pdu_count - 1)) {
@@ -417,6 +444,7 @@ void common_validate_chain_with_cte(struct ll_adv_set *adv, uint8_t cte_count,
 	if (ad_data_pdu_count > 0) {
 		ext_hdr_flags |= ULL_ADV_PDU_HDR_FIELD_AD_DATA;
 	}
+
 	common_validate_per_adv_pdu(pdu, TEST_PDU_EXT_ADV_SYNC_IND, ext_hdr_flags);
 
 	pdu_count = MAX(cte_count, ad_data_pdu_count);
@@ -440,6 +468,7 @@ void common_validate_chain_with_cte(struct ll_adv_set *adv, uint8_t cte_count,
 		if (idx < ad_data_pdu_count) {
 			ext_hdr_flags |= ULL_ADV_PDU_HDR_FIELD_AD_DATA;
 		}
+
 		common_validate_per_adv_pdu(pdu, TEST_PDU_EXT_ADV_CHAIN_IND, ext_hdr_flags);
 
 		pdu = lll_adv_pdu_linked_next_get(pdu);

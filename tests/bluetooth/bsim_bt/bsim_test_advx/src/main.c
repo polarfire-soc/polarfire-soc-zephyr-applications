@@ -9,11 +9,11 @@
 #include <stddef.h>
 
 #include <zephyr/types.h>
-#include <sys/printk.h>
-#include <sys/util.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/util.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/hci.h>
 
 #include "ll.h"
 
@@ -38,7 +38,7 @@
 #define ADV_PHY_1M      BIT(0)
 #define ADV_PHY_2M      BIT(1)
 #define ADV_PHY_CODED   BIT(2)
-#define ADV_SID         0
+#define ADV_SID         0x0a
 #define SCAN_REQ_NOT    0
 
 #define AD_OP           0x03
@@ -341,6 +341,8 @@ static void test_advx_main(void)
 	printk("success.\n");
 
 	printk("Start advertising...");
+	ext_adv_param.timeout = 0;
+	ext_adv_param.num_events = 0;
 	err = bt_le_ext_adv_start(adv, &ext_adv_param);
 	if (err) {
 		goto exit;
@@ -421,7 +423,7 @@ static void test_advx_main(void)
 	printk("Start advertising using extended commands (duration)...");
 	is_sent = false;
 	num_sent_actual = 0;
-	num_sent_expected = 4;
+	num_sent_expected = 5;
 	ext_adv_param.timeout = 50;
 	ext_adv_param.num_events = 0;
 	err = bt_le_ext_adv_start(adv, &ext_adv_param);
@@ -491,11 +493,11 @@ static void test_advx_main(void)
 	printk("Re-enable advertising using extended commands (duration)...");
 	is_sent = false;
 	num_sent_actual = 0;
-	num_sent_expected = 4;      /* 4 advertising events of (100 ms +
+	num_sent_expected = 5;      /* 5 advertising events with a spacing of (100 ms +
 				     * random_delay of upto 10 ms) transmit in
 				     * the range of 400 to 440 ms
 				     */
-	ext_adv_param.timeout = 50; /* Check there is atmost 4 advertising
+	ext_adv_param.timeout = 50; /* Check there is atmost 5 advertising
 				     * events in a timeout of 500 ms
 				     */
 	ext_adv_param.num_events = 0;
@@ -632,6 +634,25 @@ static void test_advx_main(void)
 
 	k_sleep(K_MSEC(400));
 
+	printk("Starting directed advertising...");
+	const bt_addr_le_t direct_addr = {
+		.type = BT_ADDR_LE_RANDOM,
+		.a = {
+			.val = {0x11, 0x22, 0x33, 0x44, 0x55, 0xC6}
+		}
+	};
+	const struct bt_le_adv_param adv_param = {
+		.options = BT_LE_ADV_OPT_CONNECTABLE,
+		.peer = &direct_addr,
+	};
+	err = bt_le_adv_start(&adv_param, NULL, 0, NULL, 0);
+	if (err) {
+		goto exit;
+	}
+	printk("success.\n");
+
+	k_sleep(K_MSEC(2000));
+
 	printk("Disabling...");
 	err = ll_adv_enable(handle, 0, 0, 0);
 	if (err) {
@@ -680,7 +701,7 @@ static void test_advx_main(void)
 	}
 
 	printk("enabling periodic...");
-	err = ll_adv_sync_enable(handle, 1);
+	err = ll_adv_sync_enable(handle, BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE);
 	if (err) {
 		goto exit;
 	}
@@ -774,7 +795,9 @@ static void test_advx_main(void)
 	k_sleep(K_MSEC(1000));
 
 	printk("enabling periodic...");
-	err = ll_adv_sync_enable(handle, 1);
+	err = ll_adv_sync_enable(handle,
+				 (BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE |
+				  BT_HCI_LE_SET_PER_ADV_ENABLE_ADI));
 	if (err) {
 		goto exit;
 	}
@@ -782,6 +805,16 @@ static void test_advx_main(void)
 
 	printk("Enabling extended...");
 	err = ll_adv_enable(handle, 1, 0, 0);
+	if (err) {
+		goto exit;
+	}
+	printk("success.\n");
+
+	k_sleep(K_MSEC(400));
+
+	printk("Update periodic advertising data (duplicate filter)...");
+	err = ll_adv_sync_ad_data_set(handle, AD_OP, sizeof(per_adv_data3),
+				      (void *)per_adv_data3);
 	if (err) {
 		goto exit;
 	}
@@ -941,7 +974,7 @@ static void test_advx_main(void)
 	printk("success.\n");
 
 	printk("enabling periodic...");
-	err = ll_adv_sync_enable(handle, 1);
+	err = ll_adv_sync_enable(handle, BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE);
 	if (err) {
 		goto exit;
 	}
@@ -1167,7 +1200,7 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 			bt_addr_le_copy(&per_addr, info->addr);
 		} else {
 			if ((per_sid == info->sid) &&
-			    !bt_addr_le_cmp(&per_addr, info->addr)) {
+			    bt_addr_le_eq(&per_addr, info->addr)) {
 				per_adv_evt_cnt_actual++;
 
 				printk("per_adv_evt_cnt_actual %u\n",
@@ -1419,6 +1452,8 @@ static void test_scanx_main(void)
 
 	scan_param.timeout = 0;
 
+	k_sleep(K_MSEC(2000));
+
 	printk("Start scanning for Periodic Advertisements...");
 	is_periodic = false;
 	is_reenable_addr = false;
@@ -1458,6 +1493,14 @@ static void test_scanx_main(void)
 	sync_create_param.timeout = 0xa;
 	err = bt_le_per_adv_sync_create(&sync_create_param, &sync);
 	if (err) {
+		goto exit;
+	}
+	printk("success.\n");
+
+	printk("Check duplicate Periodic Advertising Sync create before sync "
+	       "established event...");
+	err = bt_le_per_adv_sync_create(&sync_create_param, &sync);
+	if (!err) {
 		goto exit;
 	}
 	printk("success.\n");
@@ -1530,6 +1573,14 @@ static void test_scanx_main(void)
 	}
 	printk("done.\n");
 
+	printk("Check duplicate Periodic Advertising Sync create after sync "
+	       "established event...");
+	err = bt_le_per_adv_sync_create(&sync_create_param, &sync);
+	if (!err) {
+		goto exit;
+	}
+	printk("success.\n");
+
 	printk("Deleting Periodic Advertising Sync 2...");
 	err = bt_le_per_adv_sync_delete(sync);
 	if (err) {
@@ -1586,8 +1637,6 @@ static void test_scanx_main(void)
 	}
 	printk("done.\n");
 
-	printk("sync_report_len = %u\n", sync_report_len);
-
 	if (sync_report_len != 0) {
 		FAIL("Incorrect Periodic Advertising Report data.");
 	}
@@ -1635,7 +1684,7 @@ static void test_scanx_main(void)
 	}
 
 	printk("Waiting for Periodic Advertising Report of %u bytes...",
-	       sizeof(per_adv_data1));
+	       sizeof(per_adv_data2));
 	sync_report_len_prev = sync_report_len;
 	while (!is_sync_report || (sync_report_len == sync_report_len_prev)) {
 		is_sync_report = false;
@@ -1686,8 +1735,10 @@ static void test_scanx_main(void)
 
 	printk("Creating Periodic Advertising Sync 4 after sync lost...");
 	is_sync = false;
+	is_sync_report = false;
 	bt_addr_le_copy(&sync_create_param.addr, &per_addr);
-	sync_create_param.options = BT_LE_PER_ADV_SYNC_OPT_USE_PER_ADV_LIST;
+	sync_create_param.options = BT_LE_PER_ADV_SYNC_OPT_USE_PER_ADV_LIST |
+				    BT_LE_PER_ADV_SYNC_OPT_FILTER_DUPLICATE;
 	sync_create_param.sid = per_sid;
 	sync_create_param.skip = 0;
 	sync_create_param.timeout = 0xa;
@@ -1716,6 +1767,30 @@ static void test_scanx_main(void)
 		goto exit;
 	}
 	printk("success.\n");
+
+	printk("Waiting for Periodic Advertising Report of %u bytes...",
+	       sizeof(per_adv_data3));
+	sync_report_len_prev = sync_report_len;
+	while (!is_sync_report || (sync_report_len == sync_report_len_prev)) {
+		is_sync_report = false;
+		k_sleep(K_MSEC(100));
+	}
+	printk("done.\n");
+
+	if ((sync_report_len != sizeof(per_adv_data3)) ||
+	    memcmp(sync_report_data, per_adv_data3, sizeof(per_adv_data3))) {
+		FAIL("Incorrect Periodic Advertising Report data (%u != %u).",
+		     sync_report_len, sizeof(per_adv_data3));
+	}
+
+	printk("Wait for no duplicate Periodic Advertising Report"
+	       " is generated...");
+	is_sync_report = false;
+	k_sleep(K_MSEC(400));
+	if (is_sync_report) {
+		goto exit;
+	}
+	printk("success\n");
 
 	printk("Deleting Periodic Advertising Sync 4...");
 	err = bt_le_per_adv_sync_delete(sync);

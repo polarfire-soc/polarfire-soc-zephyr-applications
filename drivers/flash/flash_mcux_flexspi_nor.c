@@ -6,9 +6,10 @@
 
 #define DT_DRV_COMPAT	nxp_imx_flexspi_nor
 
-#include <drivers/flash.h>
-#include <logging/log.h>
-#include <sys/util.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/irq.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 #include "spi_nor.h"
 #include "memc_mcux_flexspi.h"
 
@@ -23,6 +24,19 @@
 static uint8_t nor_write_buf[SPI_NOR_PAGE_SIZE];
 #endif
 
+/*
+ * NOTE: If CONFIG_FLASH_MCUX_FLEXSPI_XIP is selected, Any external functions
+ * called while interacting with the flexspi MUST be relocated to SRAM or ITCM
+ * at runtime, so that the chip does not access the flexspi to read program
+ * instructions while it is being written to
+ *
+ * Additionally, no data used by this driver should be stored in flash.
+ */
+#if defined(CONFIG_FLASH_MCUX_FLEXSPI_XIP) && (CONFIG_FLASH_LOG_LEVEL > 0)
+#warning "Enabling flash driver logging and XIP mode simultaneously can cause \
+	read-while-write hazards. This configuration is not recommended."
+#endif
+
 LOG_MODULE_REGISTER(flash_flexspi_nor, CONFIG_FLASH_LOG_LEVEL);
 
 enum {
@@ -33,6 +47,7 @@ enum {
 	READ_STATUS,
 	WRITE_ENABLE,
 	ERASE_SECTOR,
+	ERASE_BLOCK,
 	PAGE_PROGRAM_INPUT,
 	PAGE_PROGRAM_QUAD_INPUT,
 	READ_ID,
@@ -43,16 +58,13 @@ enum {
 	ERASE_CHIP,
 };
 
-struct flash_flexspi_nor_config {
-	char *controller_label;
-	flexspi_port_t port;
-	flexspi_device_config_t config;
-	struct flash_pages_layout layout;
-	struct flash_parameters flash_parameters;
-};
-
+/* Device variables used in critical sections should be in this structure */
 struct flash_flexspi_nor_data {
 	const struct device *controller;
+	flexspi_device_config_t config;
+	flexspi_port_t port;
+	struct flash_pages_layout layout;
+	struct flash_parameters flash_parameters;
 };
 
 static const uint32_t flash_flexspi_nor_lut[][4] = {
@@ -78,6 +90,11 @@ static const uint32_t flash_flexspi_nor_lut[][4] = {
 
 	[ERASE_SECTOR] = {
 		FLEXSPI_LUT_SEQ(kFLEXSPI_Command_SDR,       kFLEXSPI_1PAD, SPI_NOR_CMD_SE,
+				kFLEXSPI_Command_RADDR_SDR, kFLEXSPI_1PAD, 0x18),
+	},
+
+	[ERASE_BLOCK] = {
+		FLEXSPI_LUT_SEQ(kFLEXSPI_Command_SDR,       kFLEXSPI_1PAD, SPI_NOR_CMD_BE,
 				kFLEXSPI_Command_RADDR_SDR, kFLEXSPI_1PAD, 0x18),
 	},
 
@@ -140,14 +157,13 @@ static const uint32_t flash_flexspi_nor_lut[][4] = {
 static int flash_flexspi_nor_get_vendor_id(const struct device *dev,
 		uint8_t *vendor_id)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 	uint32_t buffer = 0;
 	int ret;
 
 	flexspi_transfer_t transfer = {
 		.deviceAddress = 0,
-		.port = config->port,
+		.port = data->port,
 		.cmdType = kFLEXSPI_Read,
 		.SeqNumber = 1,
 		.seqIndex = READ_ID,
@@ -166,12 +182,11 @@ static int flash_flexspi_nor_get_vendor_id(const struct device *dev,
 static int flash_flexspi_nor_read_status(const struct device *dev,
 		uint32_t *status)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 
 	flexspi_transfer_t transfer = {
 		.deviceAddress = 0,
-		.port = config->port,
+		.port = data->port,
 		.cmdType = kFLEXSPI_Read,
 		.SeqNumber = 1,
 		.seqIndex = READ_STATUS_REG,
@@ -187,12 +202,11 @@ static int flash_flexspi_nor_read_status(const struct device *dev,
 static int flash_flexspi_nor_write_status(const struct device *dev,
 		uint32_t *status)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 
 	flexspi_transfer_t transfer = {
 		.deviceAddress = 0,
-		.port = config->port,
+		.port = data->port,
 		.cmdType = kFLEXSPI_Write,
 		.SeqNumber = 1,
 		.seqIndex = WRITE_STATUS_REG,
@@ -207,12 +221,11 @@ static int flash_flexspi_nor_write_status(const struct device *dev,
 
 static int flash_flexspi_nor_write_enable(const struct device *dev)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 
 	flexspi_transfer_t transfer = {
 		.deviceAddress = 0,
-		.port = config->port,
+		.port = data->port,
 		.cmdType = kFLEXSPI_Command,
 		.SeqNumber = 1,
 		.seqIndex = WRITE_ENABLE,
@@ -228,12 +241,11 @@ static int flash_flexspi_nor_write_enable(const struct device *dev)
 static int flash_flexspi_nor_erase_sector(const struct device *dev,
 	off_t offset)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 
 	flexspi_transfer_t transfer = {
 		.deviceAddress = offset,
-		.port = config->port,
+		.port = data->port,
 		.cmdType = kFLEXSPI_Command,
 		.SeqNumber = 1,
 		.seqIndex = ERASE_SECTOR,
@@ -241,19 +253,38 @@ static int flash_flexspi_nor_erase_sector(const struct device *dev,
 		.dataSize = 0,
 	};
 
-	LOG_DBG("Erasing sector at 0x%08x", offset);
+	LOG_DBG("Erasing sector at 0x%08zx", (ssize_t) offset);
+
+	return memc_flexspi_transfer(data->controller, &transfer);
+}
+
+static int flash_flexspi_nor_erase_block(const struct device *dev,
+					  off_t offset)
+{
+	struct flash_flexspi_nor_data *data = dev->data;
+
+	flexspi_transfer_t transfer = {
+		.deviceAddress = offset,
+		.port = data->port,
+		.cmdType = kFLEXSPI_Command,
+		.SeqNumber = 1,
+		.seqIndex = ERASE_BLOCK,
+		.data = NULL,
+		.dataSize = 0,
+	};
+
+	LOG_DBG("Erasing block at 0x%08zx", (ssize_t) offset);
 
 	return memc_flexspi_transfer(data->controller, &transfer);
 }
 
 static int flash_flexspi_nor_erase_chip(const struct device *dev)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 
 	flexspi_transfer_t transfer = {
 		.deviceAddress = 0,
-		.port = config->port,
+		.port = data->port,
 		.cmdType = kFLEXSPI_Command,
 		.SeqNumber = 1,
 		.seqIndex = ERASE_CHIP,
@@ -269,12 +300,11 @@ static int flash_flexspi_nor_erase_chip(const struct device *dev)
 static int flash_flexspi_nor_page_program(const struct device *dev,
 		off_t offset, const void *buffer, size_t len)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 
 	flexspi_transfer_t transfer = {
 		.deviceAddress = offset,
-		.port = config->port,
+		.port = data->port,
 		.cmdType = kFLEXSPI_Write,
 		.SeqNumber = 1,
 		.seqIndex = PAGE_PROGRAM_QUAD_INPUT,
@@ -282,7 +312,7 @@ static int flash_flexspi_nor_page_program(const struct device *dev,
 		.dataSize = len,
 	};
 
-	LOG_DBG("Page programming %d bytes to 0x%08x", len, offset);
+	LOG_DBG("Page programming %d bytes to 0x%08zx", len, (ssize_t) offset);
 
 	return memc_flexspi_transfer(data->controller, &transfer);
 }
@@ -319,10 +349,9 @@ static int flash_flexspi_nor_enable_quad_mode(const struct device *dev)
 static int flash_flexspi_nor_read(const struct device *dev, off_t offset,
 		void *buffer, size_t len)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 	uint8_t *src = memc_flexspi_get_ahb_address(data->controller,
-						    config->port,
+						    data->port,
 						    offset);
 
 	memcpy(buffer, src, len);
@@ -333,7 +362,6 @@ static int flash_flexspi_nor_read(const struct device *dev, off_t offset,
 static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 		const void *buffer, size_t len)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 	size_t size = len;
 	uint8_t *src = (uint8_t *) buffer;
@@ -341,10 +369,15 @@ static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 	unsigned int key = 0;
 
 	uint8_t *dst = memc_flexspi_get_ahb_address(data->controller,
-						    config->port,
+						    data->port,
 						    offset);
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/*
+		 * ==== ENTER CRITICAL SECTION ====
+		 * No flash access should be performed in critical section. All
+		 * code and data accessed must reside in ram.
+		 */
 		key = irq_lock();
 	}
 
@@ -371,6 +404,7 @@ static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 	}
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/* ==== EXIT CRITICAL SECTION ==== */
 		irq_unlock(key);
 	}
 
@@ -384,14 +418,15 @@ static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 static int flash_flexspi_nor_erase(const struct device *dev, off_t offset,
 		size_t size)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
-	int num_sectors = size / SPI_NOR_SECTOR_SIZE;
+	const size_t num_sectors = size / SPI_NOR_SECTOR_SIZE;
+	const size_t num_blocks = size / SPI_NOR_BLOCK_SIZE;
+
 	int i;
 	unsigned int key = 0;
 
 	uint8_t *dst = memc_flexspi_get_ahb_address(data->controller,
-						    config->port,
+						    data->port,
 						    offset);
 
 	if (offset % SPI_NOR_SECTOR_SIZE) {
@@ -405,14 +440,27 @@ static int flash_flexspi_nor_erase(const struct device *dev, off_t offset,
 	}
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/*
+		 * ==== ENTER CRITICAL SECTION ====
+		 * No flash access should be performed in critical section. All
+		 * code and data accessed must reside in ram.
+		 */
 		key = irq_lock();
 	}
 
-	if ((offset == 0) && (size == config->config.flashSize * KB(1))) {
+	if ((offset == 0) && (size == data->config.flashSize * KB(1))) {
 		flash_flexspi_nor_write_enable(dev);
 		flash_flexspi_nor_erase_chip(dev);
 		flash_flexspi_nor_wait_bus_busy(dev);
 		memc_flexspi_reset(data->controller);
+	} else if ((0 == (offset % SPI_NOR_BLOCK_SIZE)) && (0 == (size % SPI_NOR_BLOCK_SIZE))) {
+		for (i = 0; i < num_blocks; i++) {
+			flash_flexspi_nor_write_enable(dev);
+			flash_flexspi_nor_erase_block(dev, offset);
+			flash_flexspi_nor_wait_bus_busy(dev);
+			memc_flexspi_reset(data->controller);
+			offset += SPI_NOR_BLOCK_SIZE;
+		}
 	} else {
 		for (i = 0; i < num_sectors; i++) {
 			flash_flexspi_nor_write_enable(dev);
@@ -424,6 +472,7 @@ static int flash_flexspi_nor_erase(const struct device *dev, off_t offset,
 	}
 
 	if (memc_flexspi_is_running_xip(data->controller)) {
+		/* ==== EXIT CRITICAL SECTION ==== */
 		irq_unlock(key);
 	}
 
@@ -437,37 +486,35 @@ static int flash_flexspi_nor_erase(const struct device *dev, off_t offset,
 static const struct flash_parameters *flash_flexspi_nor_get_parameters(
 		const struct device *dev)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
+	struct flash_flexspi_nor_data *data = dev->data;
 
-	return &config->flash_parameters;
+	return &data->flash_parameters;
 }
 
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
 static void flash_flexspi_nor_pages_layout(const struct device *dev,
 		const struct flash_pages_layout **layout, size_t *layout_size)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
+	struct flash_flexspi_nor_data *data = dev->data;
 
-	*layout = &config->layout;
+	*layout = &data->layout;
 	*layout_size = 1;
 }
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 
 static int flash_flexspi_nor_init(const struct device *dev)
 {
-	const struct flash_flexspi_nor_config *config = dev->config;
 	struct flash_flexspi_nor_data *data = dev->data;
 	uint8_t vendor_id;
 
-	data->controller = device_get_binding(config->controller_label);
-	if (data->controller == NULL) {
-		LOG_ERR("Could not find controller");
-		return -EINVAL;
+	if (!device_is_ready(data->controller)) {
+		LOG_ERR("Controller device is not ready");
+		return -ENODEV;
 	}
 
 	if (!memc_flexspi_is_running_xip(data->controller) &&
-	    memc_flexspi_set_device_config(data->controller, &config->config,
-					   config->port)) {
+	    memc_flexspi_set_device_config(data->controller, &data->config,
+					   data->port)) {
 		LOG_ERR("Could not set device configuration");
 		return -EINVAL;
 	}
@@ -538,11 +585,11 @@ static const struct flash_driver_api flash_flexspi_nor_api = {
 	}								\
 
 #define FLASH_FLEXSPI_NOR(n)						\
-	static const struct flash_flexspi_nor_config			\
-		flash_flexspi_nor_config_##n = {			\
-		.controller_label = DT_INST_BUS_LABEL(n),		\
-		.port = DT_INST_REG_ADDR(n),				\
+	static struct flash_flexspi_nor_data				\
+		flash_flexspi_nor_data_##n = {				\
+		.controller = DEVICE_DT_GET(DT_INST_BUS(n)),		\
 		.config = FLASH_FLEXSPI_DEVICE_CONFIG(n),		\
+		.port = DT_INST_REG_ADDR(n),				\
 		.layout = {						\
 			.pages_count = DT_INST_PROP(n, size) / 8	\
 				/ SPI_NOR_SECTOR_SIZE,			\
@@ -554,16 +601,13 @@ static const struct flash_driver_api flash_flexspi_nor_api = {
 		},							\
 	};								\
 									\
-	static struct flash_flexspi_nor_data				\
-		flash_flexspi_nor_data_##n;				\
-									\
 	DEVICE_DT_INST_DEFINE(n,					\
 			      flash_flexspi_nor_init,			\
 			      NULL,					\
 			      &flash_flexspi_nor_data_##n,		\
-			      &flash_flexspi_nor_config_##n,		\
+			      NULL,					\
 			      POST_KERNEL,				\
-			      CONFIG_KERNEL_INIT_PRIORITY_DEVICE,	\
+			      CONFIG_FLASH_INIT_PRIORITY,		\
 			      &flash_flexspi_nor_api);
 
 DT_INST_FOREACH_STATUS_OKAY(FLASH_FLEXSPI_NOR)

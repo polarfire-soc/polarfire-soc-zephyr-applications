@@ -11,28 +11,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_core, CONFIG_NET_CORE_LOG_LEVEL);
 
-#include <init.h>
-#include <kernel.h>
-#include <toolchain.h>
-#include <linker/sections.h>
+#include <zephyr/init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/toolchain.h>
+#include <zephyr/linker/sections.h>
 #include <string.h>
 #include <errno.h>
 
-#include <net/net_if.h>
-#include <net/net_mgmt.h>
-#include <net/net_pkt.h>
-#include <net/net_core.h>
-#include <net/dns_resolve.h>
-#include <net/gptp.h>
-#include <net/websocket.h>
-#include <net/ethernet.h>
-#include <net/capture.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/net_mgmt.h>
+#include <zephyr/net/net_pkt.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/net/dns_resolve.h>
+#include <zephyr/net/gptp.h>
+#include <zephyr/net/websocket.h>
+#include <zephyr/net/ethernet.h>
+#include <zephyr/net/capture.h>
 
 #if defined(CONFIG_NET_LLDP)
-#include <net/lldp.h>
+#include <zephyr/net/lldp.h>
 #endif
 
 #include "net_private.h"
@@ -42,6 +42,7 @@ LOG_MODULE_REGISTER(net_core, CONFIG_NET_CORE_LOG_LEVEL);
 #include "ipv6.h"
 
 #include "icmpv4.h"
+#include "ipv4.h"
 
 #include "dhcpv4.h"
 
@@ -63,20 +64,21 @@ static inline enum net_verdict process_data(struct net_pkt *pkt,
 	int ret;
 	bool locally_routed = false;
 
+	net_pkt_set_l2_processed(pkt, false);
+
+	/* Initial call will forward packets to SOCK_RAW packet sockets. */
 	ret = net_packet_socket_input(pkt, ETH_P_ALL);
 	if (ret != NET_CONTINUE) {
 		return ret;
 	}
 
-#if defined(CONFIG_NET_IPV6_FRAGMENT)
-	/* If the packet is routed back to us when we have reassembled
-	 * an IPv6 packet, then do not pass it to L2 as the packet does
-	 * not have link layer headers in it.
+	/* If the packet is routed back to us when we have reassembled an IPv4 or IPv6 packet,
+	 * then do not pass it to L2 as the packet does not have link layer headers in it.
 	 */
-	if (net_pkt_ipv6_fragment_start(pkt)) {
+	if ((IS_ENABLED(CONFIG_NET_IPV4_FRAGMENT) && net_pkt_ipv4_fragment_more(pkt)) ||
+	    (IS_ENABLED(CONFIG_NET_IPV6_FRAGMENT) && net_pkt_ipv6_fragment_start(pkt))) {
 		locally_routed = true;
 	}
-#endif
 
 	/* If there is no data, then drop the packet. */
 	if (!pkt->frags) {
@@ -99,39 +101,52 @@ static inline enum net_verdict process_data(struct net_pkt *pkt,
 		}
 	}
 
-	/* L2 processed, now we can pass IPPROTO_RAW to packet socket: */
-	ret = net_packet_socket_input(pkt, IPPROTO_RAW);
-	if (ret != NET_CONTINUE) {
-		return ret;
-	}
-
-	ret = net_canbus_socket_input(pkt);
-	if (ret != NET_CONTINUE) {
-		return ret;
-	}
+	net_pkt_set_l2_processed(pkt, true);
 
 	/* L2 has modified the buffer starting point, it is easier
 	 * to re-initialize the cursor rather than updating it.
 	 */
 	net_pkt_cursor_init(pkt);
 
-	/* IP version and header length. */
-	switch (NET_IPV6_HDR(pkt)->vtc & 0xf0) {
-#if defined(CONFIG_NET_IPV6)
-	case 0x60:
-		return net_ipv6_input(pkt, is_loopback);
-#endif
-#if defined(CONFIG_NET_IPV4)
-	case 0x40:
-		return net_ipv4_input(pkt);
-#endif
+	if (IS_ENABLED(CONFIG_NET_SOCKETS_PACKET_DGRAM)) {
+		/* Consecutive call will forward packets to SOCK_DGRAM packet sockets
+		 * (after L2 removed header).
+		 */
+		ret = net_packet_socket_input(pkt, ETH_P_ALL);
+		if (ret != NET_CONTINUE) {
+			return ret;
+		}
 	}
 
-	NET_DBG("Unknown IP family packet (0x%x)",
-		NET_IPV6_HDR(pkt)->vtc & 0xf0);
-	net_stats_update_ip_errors_protoerr(net_pkt_iface(pkt));
-	net_stats_update_ip_errors_vhlerr(net_pkt_iface(pkt));
+	uint8_t family = net_pkt_family(pkt);
 
+	if (IS_ENABLED(CONFIG_NET_IP) && (family == AF_INET || family == AF_INET6 ||
+					  family == AF_UNSPEC || family == AF_PACKET)) {
+		/* L2 processed, now we can pass IPPROTO_RAW to packet socket:
+		 */
+		ret = net_packet_socket_input(pkt, IPPROTO_RAW);
+		if (ret != NET_CONTINUE) {
+			return ret;
+		}
+
+		/* IP version and header length. */
+		uint8_t vtc_vhl = NET_IPV6_HDR(pkt)->vtc & 0xf0;
+
+		if (IS_ENABLED(CONFIG_NET_IPV6) && vtc_vhl == 0x60) {
+			return net_ipv6_input(pkt, is_loopback);
+		} else if (IS_ENABLED(CONFIG_NET_IPV4) && vtc_vhl == 0x40) {
+			return net_ipv4_input(pkt);
+		}
+
+		NET_DBG("Unknown IP family packet (0x%x)", NET_IPV6_HDR(pkt)->vtc & 0xf0);
+		net_stats_update_ip_errors_protoerr(net_pkt_iface(pkt));
+		net_stats_update_ip_errors_vhlerr(net_pkt_iface(pkt));
+		return NET_DROP;
+	} else if (IS_ENABLED(CONFIG_NET_SOCKETS_CAN) && family == AF_CAN) {
+		return net_canbus_socket_input(pkt);
+	}
+
+	NET_DBG("Unknown protocol family packet (0x%x)", family);
 	return NET_DROP;
 }
 
@@ -191,15 +206,16 @@ static void init_rx_queues(void)
 /* If loopback driver is enabled, then direct packets to it so the address
  * check is not needed.
  */
-#if defined(CONFIG_NET_IP_ADDR_CHECK) && !defined(CONFIG_NET_LOOPBACK)
+#if defined(CONFIG_NET_IP) && defined(CONFIG_NET_IP_ADDR_CHECK) && !defined(CONFIG_NET_LOOPBACK)
 /* Check if the IPv{4|6} addresses are proper. As this can be expensive,
  * make this optional.
  */
 static inline int check_ip_addr(struct net_pkt *pkt)
 {
-#if defined(CONFIG_NET_IPV6)
-	if (net_pkt_family(pkt) == AF_INET6) {
-		if (net_ipv6_addr_cmp(&NET_IPV6_HDR(pkt)->dst,
+	uint8_t family = net_pkt_family(pkt);
+
+	if (IS_ENABLED(CONFIG_NET_IPV6) && family == AF_INET6) {
+		if (net_ipv6_addr_cmp((struct in6_addr *)NET_IPV6_HDR(pkt)->dst,
 				      net_ipv6_unspecified_address())) {
 			NET_DBG("IPv6 dst address missing");
 			return -EADDRNOTAVAIL;
@@ -208,17 +224,19 @@ static inline int check_ip_addr(struct net_pkt *pkt)
 		/* If the destination address is our own, then route it
 		 * back to us.
 		 */
-		if (net_ipv6_is_addr_loopback(&NET_IPV6_HDR(pkt)->dst) ||
-		    net_ipv6_is_my_addr(&NET_IPV6_HDR(pkt)->dst)) {
+		if (net_ipv6_is_addr_loopback(
+				(struct in6_addr *)NET_IPV6_HDR(pkt)->dst) ||
+		    net_ipv6_is_my_addr(
+				(struct in6_addr *)NET_IPV6_HDR(pkt)->dst)) {
 			struct in6_addr addr;
 
 			/* Swap the addresses so that in receiving side
 			 * the packet is accepted.
 			 */
-			net_ipaddr_copy(&addr, &NET_IPV6_HDR(pkt)->src);
-			net_ipaddr_copy(&NET_IPV6_HDR(pkt)->src,
-					&NET_IPV6_HDR(pkt)->dst);
-			net_ipaddr_copy(&NET_IPV6_HDR(pkt)->dst, &addr);
+			net_ipv6_addr_copy_raw((uint8_t *)&addr, NET_IPV6_HDR(pkt)->src);
+			net_ipv6_addr_copy_raw(NET_IPV6_HDR(pkt)->src,
+					       NET_IPV6_HDR(pkt)->dst);
+			net_ipv6_addr_copy_raw(NET_IPV6_HDR(pkt)->dst, (uint8_t *)&addr);
 
 			return 1;
 		}
@@ -229,7 +247,8 @@ static inline int check_ip_addr(struct net_pkt *pkt)
 		 * in local host, so this is similar as how ::1 unicast
 		 * addresses are handled. See RFC 3513 ch 2.7 for details.
 		 */
-		if (net_ipv6_is_addr_mcast_iface(&NET_IPV6_HDR(pkt)->dst)) {
+		if (net_ipv6_is_addr_mcast_iface(
+				(struct in6_addr *)NET_IPV6_HDR(pkt)->dst)) {
 			NET_DBG("IPv6 interface scope mcast dst address");
 			return 1;
 		}
@@ -237,16 +256,13 @@ static inline int check_ip_addr(struct net_pkt *pkt)
 		/* The source check must be done after the destination check
 		 * as having src ::1 is perfectly ok if dst is ::1 too.
 		 */
-		if (net_ipv6_is_addr_loopback(&NET_IPV6_HDR(pkt)->src)) {
+		if (net_ipv6_is_addr_loopback(
+				(struct in6_addr *)NET_IPV6_HDR(pkt)->src)) {
 			NET_DBG("IPv6 loopback src address");
 			return -EADDRNOTAVAIL;
 		}
-	} else
-#endif /* CONFIG_NET_IPV6 */
-
-#if defined(CONFIG_NET_IPV4)
-	if (net_pkt_family(pkt) == AF_INET) {
-		if (net_ipv4_addr_cmp(&NET_IPV4_HDR(pkt)->dst,
+	} else if (IS_ENABLED(CONFIG_NET_IPV4) && family == AF_INET) {
+		if (net_ipv4_addr_cmp((struct in_addr *)NET_IPV4_HDR(pkt)->dst,
 				      net_ipv4_unspecified_address())) {
 			NET_DBG("IPv4 dst address missing");
 			return -EADDRNOTAVAIL;
@@ -255,19 +271,19 @@ static inline int check_ip_addr(struct net_pkt *pkt)
 		/* If the destination address is our own, then route it
 		 * back to us.
 		 */
-		if (net_ipv4_is_addr_loopback(&NET_IPV4_HDR(pkt)->dst) ||
+		if (net_ipv4_is_addr_loopback((struct in_addr *)NET_IPV4_HDR(pkt)->dst) ||
 		    (net_ipv4_is_addr_bcast(net_pkt_iface(pkt),
-				     &NET_IPV4_HDR(pkt)->dst) == false &&
-		     net_ipv4_is_my_addr(&NET_IPV4_HDR(pkt)->dst))) {
+				     (struct in_addr *)NET_IPV4_HDR(pkt)->dst) == false &&
+		     net_ipv4_is_my_addr((struct in_addr *)NET_IPV4_HDR(pkt)->dst))) {
 			struct in_addr addr;
 
 			/* Swap the addresses so that in receiving side
 			 * the packet is accepted.
 			 */
-			net_ipaddr_copy(&addr, &NET_IPV4_HDR(pkt)->src);
-			net_ipaddr_copy(&NET_IPV4_HDR(pkt)->src,
-					&NET_IPV4_HDR(pkt)->dst);
-			net_ipaddr_copy(&NET_IPV4_HDR(pkt)->dst, &addr);
+			net_ipv4_addr_copy_raw((uint8_t *)&addr, NET_IPV4_HDR(pkt)->src);
+			net_ipv4_addr_copy_raw(NET_IPV4_HDR(pkt)->src,
+					       NET_IPV4_HDR(pkt)->dst);
+			net_ipv4_addr_copy_raw(NET_IPV4_HDR(pkt)->dst, (uint8_t *)&addr);
 
 			return 1;
 		}
@@ -276,15 +292,10 @@ static inline int check_ip_addr(struct net_pkt *pkt)
 		 * as having src 127.0.0.0/8 is perfectly ok if dst is in
 		 * localhost subnet too.
 		 */
-		if (net_ipv4_is_addr_loopback(&NET_IPV4_HDR(pkt)->src)) {
+		if (net_ipv4_is_addr_loopback((struct in_addr *)NET_IPV4_HDR(pkt)->src)) {
 			NET_DBG("IPv4 loopback src address");
 			return -EADDRNOTAVAIL;
 		}
-	} else
-#endif /* CONFIG_NET_IPV4 */
-
-	{
-		;
 	}
 
 	return 0;
@@ -395,7 +406,7 @@ static void net_queue_rx(struct net_if *iface, struct net_pkt *pkt)
 	}
 }
 
-/* Called by driver when an IP packet has been received */
+/* Called by driver when a packet has been received */
 int net_recv_data(struct net_if *iface, struct net_pkt *pkt)
 {
 	if (!pkt || !iface) {
@@ -422,7 +433,12 @@ int net_recv_data(struct net_if *iface, struct net_pkt *pkt)
 
 	net_pkt_set_iface(pkt, iface);
 
-	net_queue_rx(iface, pkt);
+	if (!net_pkt_filter_recv_ok(pkt)) {
+		/* silently drop the packet */
+		net_pkt_unref(pkt);
+	} else {
+		net_queue_rx(iface, pkt);
+	}
 
 	return 0;
 }
@@ -431,6 +447,7 @@ static inline void l3_init(void)
 {
 	net_icmpv4_init();
 	net_icmpv6_init();
+	net_ipv4_init();
 	net_ipv6_init();
 
 	net_ipv4_autoconf_init();

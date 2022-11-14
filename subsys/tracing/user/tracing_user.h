@@ -1,27 +1,46 @@
 /*
  * Copyright (c) 2020 Lexmark International, Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifndef _TRACE_USER_H
 #define _TRACE_USER_H
-#include <kernel.h>
-#include <kernel_structs.h>
-#include <init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/kernel_structs.h>
+#include <zephyr/init.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+void sys_trace_thread_create_user(struct k_thread *thread);
+void sys_trace_thread_abort_user(struct k_thread *thread);
+void sys_trace_thread_suspend_user(struct k_thread *thread);
+void sys_trace_thread_resume_user(struct k_thread *thread);
+void sys_trace_thread_name_set_user(struct k_thread *thread);
 void sys_trace_thread_switched_in_user(struct k_thread *thread);
 void sys_trace_thread_switched_out_user(struct k_thread *thread);
-void sys_trace_isr_enter_user(void);
-void sys_trace_isr_exit_user(void);
+void sys_trace_thread_info_user(struct k_thread *thread);
+void sys_trace_thread_priority_set_user(struct k_thread *thread, int prio);
+void sys_trace_thread_sched_ready_user(struct k_thread *thread);
+void sys_trace_thread_pend_user(struct k_thread *thread);
+void sys_trace_isr_enter_user(int nested_interrupts);
+void sys_trace_isr_exit_user(int nested_interrupts);
 void sys_trace_idle_user(void);
 
+void sys_trace_thread_create(struct k_thread *thread);
+void sys_trace_thread_abort(struct k_thread *thread);
+void sys_trace_thread_suspend(struct k_thread *thread);
+void sys_trace_thread_resume(struct k_thread *thread);
+void sys_trace_thread_name_set(struct k_thread *thread);
 void sys_trace_k_thread_switched_in(void);
 void sys_trace_k_thread_switched_out(void);
+void sys_trace_thread_info(struct k_thread *thread);
+void sys_trace_thread_sched_priority_set(struct k_thread *thread, int prio);
+void sys_trace_thread_sched_ready(struct k_thread *thread);
+void sys_trace_thread_pend(struct k_thread *thread);
 void sys_trace_isr_enter(void);
 void sys_trace_isr_exit(void);
 void sys_trace_idle(void);
@@ -30,7 +49,7 @@ void sys_trace_idle(void);
 #define sys_port_trace_k_thread_foreach_exit()
 #define sys_port_trace_k_thread_foreach_unlocked_enter()
 #define sys_port_trace_k_thread_foreach_unlocked_exit()
-#define sys_port_trace_k_thread_create(new_thread)
+#define sys_port_trace_k_thread_create(new_thread) sys_trace_thread_create(new_thread)
 #define sys_port_trace_k_thread_user_mode_enter()
 #define sys_port_trace_k_thread_heap_assign(thread, heap)
 #define sys_port_trace_k_thread_join_enter(thread, timeout)
@@ -47,22 +66,23 @@ void sys_trace_idle(void);
 #define sys_port_trace_k_thread_yield()
 #define sys_port_trace_k_thread_wakeup(thread)
 #define sys_port_trace_k_thread_start(thread)
-#define sys_port_trace_k_thread_abort(thread)
-#define sys_port_trace_k_thread_suspend_enter(thread)
+#define sys_port_trace_k_thread_abort(thread) sys_trace_thread_abort(thread)
+#define sys_port_trace_k_thread_suspend_enter(thread) sys_trace_thread_suspend(thread)
 #define sys_port_trace_k_thread_suspend_exit(thread)
-#define sys_port_trace_k_thread_resume_enter(thread)
+#define sys_port_trace_k_thread_resume_enter(thread) sys_trace_thread_resume(thread)
 #define sys_port_trace_k_thread_sched_lock()
 #define sys_port_trace_k_thread_sched_unlock()
-#define sys_port_trace_k_thread_name_set(thread, ret)
+#define sys_port_trace_k_thread_name_set(thread, ret) sys_trace_thread_name_set(thread)
 #define sys_port_trace_k_thread_switched_out() sys_trace_k_thread_switched_out()
 #define sys_port_trace_k_thread_switched_in() sys_trace_k_thread_switched_in()
-#define sys_port_trace_k_thread_info(thread)
+#define sys_port_trace_k_thread_info(thread) sys_trace_thread_info(thread)
 
 #define sys_port_trace_k_thread_sched_wakeup(thread)
 #define sys_port_trace_k_thread_sched_abort(thread)
-#define sys_port_trace_k_thread_sched_priority_set(thread, prio)
-#define sys_port_trace_k_thread_sched_ready(thread)
-#define sys_port_trace_k_thread_sched_pend(thread)
+#define sys_port_trace_k_thread_sched_priority_set(thread, prio) \
+	sys_trace_thread_sched_priority_set(thread, prio)
+#define sys_port_trace_k_thread_sched_ready(thread) sys_trace_thread_sched_ready(thread)
+#define sys_port_trace_k_thread_sched_pend(thread) sys_trace_thread_pend(thread)
 #define sys_port_trace_k_thread_sched_resume(thread)
 #define sys_port_trace_k_thread_sched_suspend(thread)
 
@@ -80,6 +100,7 @@ void sys_trace_idle(void);
 #define sys_port_trace_k_work_cancel_sync_blocking(work, sync)
 #define sys_port_trace_k_work_cancel_sync_exit(work, sync, ret)
 
+#define sys_port_trace_k_work_queue_init(queue)
 #define sys_port_trace_k_work_queue_start_enter(queue)
 #define sys_port_trace_k_work_queue_start_exit(queue)
 #define sys_port_trace_k_work_queue_drain_enter(queue)
@@ -251,6 +272,10 @@ void sys_trace_idle(void);
 #define sys_port_trace_k_pipe_cleanup_exit(pipe, ret)
 #define sys_port_trace_k_pipe_alloc_init_enter(pipe)
 #define sys_port_trace_k_pipe_alloc_init_exit(pipe, ret)
+#define sys_port_trace_k_pipe_flush_enter(pipe)
+#define sys_port_trace_k_pipe_flush_exit(pipe)
+#define sys_port_trace_k_pipe_buffer_flush_enter(pipe)
+#define sys_port_trace_k_pipe_buffer_flush_exit(pipe)
 #define sys_port_trace_k_pipe_put_enter(pipe, timeout)
 #define sys_port_trace_k_pipe_put_blocking(pipe, timeout)
 #define sys_port_trace_k_pipe_put_exit(pipe, timeout, ret)
@@ -271,8 +296,8 @@ void sys_trace_idle(void);
 #define sys_port_trace_k_heap_sys_k_aligned_alloc_exit(heap, ret)
 #define sys_port_trace_k_heap_sys_k_malloc_enter(heap)
 #define sys_port_trace_k_heap_sys_k_malloc_exit(heap, ret)
-#define sys_port_trace_k_heap_sys_k_free_enter(heap)
-#define sys_port_trace_k_heap_sys_k_free_exit(heap)
+#define sys_port_trace_k_heap_sys_k_free_enter(heap, heap_ref)
+#define sys_port_trace_k_heap_sys_k_free_exit(heap, heap_ref)
 #define sys_port_trace_k_heap_sys_k_calloc_enter(heap)
 #define sys_port_trace_k_heap_sys_k_calloc_exit(heap, ret)
 
@@ -284,15 +309,15 @@ void sys_trace_idle(void);
 #define sys_port_trace_k_mem_slab_free_exit(slab)
 
 #define sys_port_trace_k_timer_init(timer)
-#define sys_port_trace_k_timer_start(timer)
+#define sys_port_trace_k_timer_start(timer, duration, period)
 #define sys_port_trace_k_timer_stop(timer)
 #define sys_port_trace_k_timer_status_sync_enter(timer)
 #define sys_port_trace_k_timer_status_sync_blocking(timer, timeout)
 #define sys_port_trace_k_timer_status_sync_exit(timer, result)
 
 #define sys_port_trace_k_event_init(event)
-#define sys_port_trace_k_event_post_enter(event, events, accumulate)
-#define sys_port_trace_k_event_post_exit(event, events, accumulate)
+#define sys_port_trace_k_event_post_enter(event, events, events_mask)
+#define sys_port_trace_k_event_post_exit(event, events, events_mask)
 #define sys_port_trace_k_event_wait_enter(event, events, options, timeout)
 #define sys_port_trace_k_event_wait_blocking(event, events, options, timeout)
 #define sys_port_trace_k_event_wait_exit(event, events, ret)
@@ -300,6 +325,20 @@ void sys_trace_idle(void);
 #define sys_port_trace_k_thread_abort_exit(thread)
 #define sys_port_trace_k_thread_abort_enter(thread)
 #define sys_port_trace_k_thread_resume_exit(thread)
+
+#define sys_port_trace_pm_system_suspend_enter(ticks)
+#define sys_port_trace_pm_system_suspend_exit(ticks, state)
+
+#define sys_port_trace_pm_device_runtime_get_enter(dev)
+#define sys_port_trace_pm_device_runtime_get_exit(dev, ret)
+#define sys_port_trace_pm_device_runtime_put_enter(dev)
+#define sys_port_trace_pm_device_runtime_put_exit(dev, ret)
+#define sys_port_trace_pm_device_runtime_put_async_enter(dev)
+#define sys_port_trace_pm_device_runtime_put_async_exit(dev, ret)
+#define sys_port_trace_pm_device_runtime_enable_enter(dev)
+#define sys_port_trace_pm_device_runtime_enable_exit(dev, ret)
+#define sys_port_trace_pm_device_runtime_disable_enter(dev)
+#define sys_port_trace_pm_device_runtime_disable_exit(dev, ret)
 
 #ifdef __cplusplus
 }

@@ -5,11 +5,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <drivers/gpio.h>
-#include <drivers/lora.h>
-#include <logging/log.h>
-#include <sys/atomic.h>
-#include <zephyr.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/lora.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/kernel.h>
 
 /* LoRaMac-node specific includes */
 #include <radio.h>
@@ -30,28 +30,28 @@ struct sx12xx_rx_params {
 };
 
 static struct sx12xx_data {
+	const struct device *dev;
 	struct k_poll_signal *operation_done;
+	lora_recv_cb async_rx_cb;
 	RadioEvents_t events;
 	struct lora_modem_config tx_cfg;
 	atomic_t modem_usage;
 	struct sx12xx_rx_params rx_params;
 } dev_data;
 
-int __sx12xx_configure_pin(const struct device **dev, const char *controller,
-			   gpio_pin_t pin, gpio_flags_t flags)
+int __sx12xx_configure_pin(const struct gpio_dt_spec *gpio, gpio_flags_t flags)
 {
 	int err;
 
-	*dev = device_get_binding(controller);
-	if (!(*dev)) {
-		LOG_ERR("Cannot get pointer to %s device", controller);
-		return -EIO;
+	if (!device_is_ready(gpio->port)) {
+		LOG_ERR("GPIO device not ready %s", gpio->port->name);
+		return -ENODEV;
 	}
 
-	err = gpio_pin_configure(*dev, pin, flags);
+	err = gpio_pin_configure_dt(gpio, flags);
 	if (err) {
-		LOG_ERR("Cannot configure gpio %s %d: %d", controller, pin,
-			err);
+		LOG_ERR("Cannot configure gpio %s %d: %d", gpio->port->name,
+			gpio->pin, err);
 		return err;
 	}
 
@@ -100,6 +100,16 @@ static void sx12xx_ev_rx_done(uint8_t *payload, uint16_t size, int16_t rssi,
 			      int8_t snr)
 {
 	struct k_poll_signal *sig = dev_data.operation_done;
+
+	/* Receiving in asynchronous mode */
+	if (dev_data.async_rx_cb) {
+		/* Start receiving again */
+		Radio.Rx(0);
+		/* Run the callback */
+		dev_data.async_rx_cb(dev_data.dev, payload, size, rssi, snr);
+		/* Don't run the synchronous code */
+		return;
+	}
 
 	/* Manually release the modem instead of just calling modem_release
 	 * as we need to perform cleanup operations while still ensuring
@@ -196,7 +206,7 @@ int sx12xx_lora_send(const struct device *dev, uint8_t *data,
 			k_poll(&evt, 1, K_FOREVER);
 		}
 	}
-	return 0;
+	return ret;
 }
 
 int sx12xx_lora_send_async(const struct device *dev, uint8_t *data,
@@ -232,6 +242,7 @@ int sx12xx_lora_recv(const struct device *dev, uint8_t *data, uint8_t size,
 		return -EBUSY;
 	}
 
+	dev_data.async_rx_cb = NULL;
 	/* Store operation signal */
 	dev_data.operation_done = &done;
 	/* Set data output location */
@@ -262,6 +273,32 @@ int sx12xx_lora_recv(const struct device *dev, uint8_t *data, uint8_t size,
 	return size;
 }
 
+int sx12xx_lora_recv_async(const struct device *dev, lora_recv_cb cb)
+{
+	/* Cancel ongoing reception */
+	if (cb == NULL) {
+		if (!modem_release(&dev_data)) {
+			/* Not receiving or already being stopped */
+			return -EINVAL;
+		}
+		return 0;
+	}
+
+	/* Ensure available */
+	if (!modem_acquire(&dev_data)) {
+		return -EBUSY;
+	}
+
+	/* Store parameters */
+	dev_data.async_rx_cb = cb;
+
+	/* Start reception */
+	Radio.SetMaxPayloadLength(MODEM_LORA, 255);
+	Radio.Rx(0);
+
+	return 0;
+}
+
 int sx12xx_lora_config(const struct device *dev,
 		       struct lora_modem_config *config)
 {
@@ -279,14 +316,16 @@ int sx12xx_lora_config(const struct device *dev,
 		Radio.SetTxConfig(MODEM_LORA, config->tx_power, 0,
 				  config->bandwidth, config->datarate,
 				  config->coding_rate, config->preamble_len,
-				  false, true, 0, 0, false, 4000);
+				  false, true, 0, 0, config->iq_inverted, 4000);
 	} else {
 		/* TODO: Get symbol timeout value from config parameters */
 		Radio.SetRxConfig(MODEM_LORA, config->bandwidth,
 				  config->datarate, config->coding_rate,
 				  0, config->preamble_len, 10, false, 0,
-				  false, 0, 0, false, true);
+				  false, 0, 0, config->iq_inverted, true);
 	}
+
+	Radio.SetPublicNetwork(config->public_network);
 
 	modem_release(&dev_data);
 	return 0;
@@ -309,6 +348,7 @@ int sx12xx_init(const struct device *dev)
 {
 	atomic_set(&dev_data.modem_usage, 0);
 
+	dev_data.dev = dev;
 	dev_data.events.TxDone = sx12xx_ev_tx_done;
 	dev_data.events.RxDone = sx12xx_ev_rx_done;
 	Radio.Init(&dev_data.events);
