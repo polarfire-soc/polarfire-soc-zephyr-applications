@@ -1,0 +1,23 @@
+/ {
+		sram2: memory@a080000 {
+			compatible = "mmio-sram";
+			reg = <0xA080000 0x80000>;
+		};
+
+	uart1: uart@20100000 {
+		compatible = "ns16550";
+		reg = <0x20100000 0x1000>;
+		clock-frequency = <150000000>;
+		current-speed = <115200>;
+		interrupt-parent = <&plic>;
+		interrupts = <91 1>;
+		reg-shift = <2>;
+		status = "okay";
+	};
+
+	 chosen {
+			 zephyr,console = &uart1;
+			 zephyr,shell-uart = &uart1;
+			 zephyr,sram = &sram2;
+	 };
+};
