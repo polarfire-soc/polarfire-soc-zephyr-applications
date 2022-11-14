@@ -7,19 +7,19 @@
  *  This file is part of mbed TLS (https://tls.mbed.org)
  */
 
-#include <sys/printk.h>
+#include <zephyr/sys/printk.h>
 #define  MBEDTLS_PRINT (int(*)(const char *, ...)) printk
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <zephyr.h>
-#include <linker/sections.h>
+#include <zephyr/kernel.h>
+#include <zephyr/linker/sections.h>
 #include <errno.h>
 
-#include <tc_util.h>
-#include <ztest.h>
+#include <zephyr/tc_util.h>
+#include <zephyr/ztest.h>
 
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
 
@@ -71,7 +71,7 @@
 #include "mbedtls/memory_buffer_alloc.h"
 #endif
 
-static int test_snprintf(size_t n, const char ref_buf[10], int ref_ret)
+static int test_snprintf(size_t n, const char *ref_buf, int ref_ret)
 {
 	int ret;
 	char buf[10] = "xxxxxxxxx";
@@ -143,7 +143,7 @@ static void create_entropy_seed_file(void)
 ZTEST_BMEM unsigned char buf[16000];
 #endif
 
-void test_mbedtls(void)
+ZTEST_USER(mbedtls_fn, test_mbedtls)
 {
 	int v, suites_tested = 0, suites_failed = 0;
 

@@ -3,14 +3,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <logging/log.h>
-#include <sys/p4wq.h>
-#include <wait_q.h>
-#include <kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/p4wq.h>
+#include <zephyr/wait_q.h>
+#include <zephyr/kernel.h>
 #include <ksched.h>
-#include <init.h>
+#include <zephyr/init.h>
 
-LOG_MODULE_REGISTER(p4wq);
+LOG_MODULE_REGISTER(p4wq, CONFIG_LOG_DEFAULT_LEVEL);
 
 struct device;
 
@@ -251,7 +251,7 @@ void k_p4wq_submit(struct k_p4wq *queue, struct k_p4wq_work *item)
 	 * preempted and we can return.
 	 */
 	struct k_p4wq_work *wi;
-	uint32_t n_beaten_by = 0, active_target = CONFIG_MP_NUM_CPUS;
+	uint32_t n_beaten_by = 0, active_target = arch_num_cpus();
 
 	SYS_DLIST_FOR_EACH_CONTAINER(&queue->active, wi, dlnode) {
 		/*

@@ -8,12 +8,12 @@
 #ifndef ZEPHYR_INCLUDE_DRIVERS_WIFI_ESP_AT_ESP_H_
 #define ZEPHYR_INCLUDE_DRIVERS_WIFI_ESP_AT_ESP_H_
 
-#include <kernel.h>
-#include <net/net_context.h>
-#include <net/net_if.h>
-#include <net/net_ip.h>
-#include <net/net_pkt.h>
-#include <net/wifi_mgmt.h>
+#include <zephyr/kernel.h>
+#include <zephyr/net/net_context.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/net_pkt.h>
+#include <zephyr/net/wifi_mgmt.h>
 
 #include "modem_context.h"
 #include "modem_cmd_handler.h"
@@ -59,7 +59,7 @@ extern "C" {
 #define ESP_PROTO_PASSIVE(proto) 0
 #endif /* CONFIG_WIFI_ESP_AT_PASSIVE_MODE */
 
-#define ESP_BUS DT_BUS(DT_DRV_INST(0))
+#define ESP_BUS DT_INST_BUS(0)
 
 #if DT_PROP(ESP_BUS, hw_flow_control) == 1
 #define _FLOW_CONTROL "3"
@@ -81,8 +81,6 @@ extern "C" {
 
 #if defined(CONFIG_WIFI_ESP_AT_DNS_USE)
 #define ESP_MAX_DNS	MIN(3, CONFIG_DNS_RESOLVER_MAX_SERVERS)
-#else
-#define ESP_MAX_DNS	0
 #endif
 
 #define ESP_MAX_SOCKETS 5
@@ -107,8 +105,11 @@ extern "C" {
 #define ESP_MODE_AP		2
 #define ESP_MODE_STA_AP		3
 
-#define ESP_CMD_CWMODE(mode) \
-	"AT+"_CWMODE"="STRINGIFY(_CONCAT(ESP_MODE_, mode))
+#if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7) || defined(CONFIG_WIFI_ESP_AT_VERSION_2_0)
+#define ESP_CMD_CWMODE(mode) "AT+"_CWMODE"="STRINGIFY(_CONCAT(ESP_MODE_, mode))
+#else
+#define ESP_CMD_CWMODE(mode) "AT+"_CWMODE"="STRINGIFY(_CONCAT(ESP_MODE_, mode))",0"
+#endif
 
 #define ESP_CWDHCP_MODE_STATION		"1"
 #if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7)
@@ -224,7 +225,9 @@ struct esp_data {
 	struct in_addr gw;
 	struct in_addr nm;
 	uint8_t mac_addr[6];
+#if defined(ESP_MAX_DNS)
 	struct sockaddr_in dns_addresses[ESP_MAX_DNS];
+#endif
 
 	/* modem context */
 	struct modem_context mctx;
@@ -247,6 +250,7 @@ struct esp_data {
 	struct k_work_delayable ip_addr_work;
 	struct k_work scan_work;
 	struct k_work connect_work;
+	struct k_work disconnect_work;
 	struct k_work mode_switch_work;
 	struct k_work dns_work;
 
@@ -404,7 +408,7 @@ static inline enum net_sock_type esp_socket_type(struct esp_socket *sock)
 
 static inline enum net_ip_protocol esp_socket_ip_proto(struct esp_socket *sock)
 {
-	return net_context_get_ip_proto(sock->context);
+	return net_context_get_proto(sock->context);
 }
 
 static inline int esp_cmd_send(struct esp_data *data,

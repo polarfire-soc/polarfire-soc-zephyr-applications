@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <linker/linker-defs.h>
-#include <syscall_handler.h>
+#include <zephyr/ztest.h>
+#include <zephyr/linker/linker-defs.h>
+#include <zephyr/syscall_handler.h>
 
 static volatile int test_flag;
 
@@ -15,7 +15,7 @@ __ramfunc static void arm_ram_function(void)
 	test_flag = 1;
 }
 
-void test_arm_ramfunc(void)
+ZTEST(arm_ramfunc, test_arm_ramfunc)
 {
 	int init_flag, post_flag;
 

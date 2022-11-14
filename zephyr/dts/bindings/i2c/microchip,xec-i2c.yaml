@@ -5,7 +5,7 @@ description: Microchip I2C/SMB controller
 
 compatible: "microchip,xec-i2c"
 
-include: i2c-controller.yaml
+include: [i2c-controller.yaml, pinctrl-device.yaml]
 
 properties:
     reg:
@@ -25,3 +25,23 @@ properties:
       type: int
       required: true
       description: Bit position in GIRQ for this device
+
+    pinctrl-0:
+      required: true
+
+    pinctrl-names:
+      required: true
+
+    sda-gpios:
+      type: phandle-array
+      required: true
+      description: |
+        The SDA pin for the selected port. Pin choice for port is
+        determined by chip and package.
+
+    scl-gpios:
+      type: phandle-array
+      required: true
+      description: |
+        The SCL pin for the selected port. Pin choice for port is
+        determined by chip and package.

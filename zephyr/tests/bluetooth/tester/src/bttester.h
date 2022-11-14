@@ -6,7 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <sys/util.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/bluetooth/addr.h>
 
 #define BTP_MTU 1024
 #define BTP_DATA_MAX_SIZE (BTP_MTU - sizeof(struct btp_hdr))
@@ -228,12 +229,15 @@ struct gap_passkey_confirm_cmd {
 	uint8_t match;
 } __packed;
 
+#define GAP_START_DIRECTED_ADV_HD	BIT(0)
+#define GAP_START_DIRECTED_ADV_OWN_ID	BIT(1)
+#define GAP_START_DIRECTED_ADV_PEER_RPA	BIT(2)
+
 #define GAP_START_DIRECTED_ADV		0x15
 struct gap_start_directed_adv_cmd {
 	uint8_t address_type;
 	uint8_t address[6];
-	uint8_t high_duty;
-	uint8_t own_id_addr;
+	uint16_t options;
 } __packed;
 struct gap_start_directed_adv_rp {
 	uint32_t current_settings;
@@ -276,6 +280,12 @@ struct gap_oob_sc_set_remote_data_cmd {
 #define GAP_SET_MITM			0x1b
 struct gap_set_mitm {
 	uint8_t mitm;
+} __packed;
+
+#define GAP_SET_FILTER_LIST		0x1c
+struct gap_set_filter_list {
+	uint8_t cnt;
+	bt_addr_le_t addr[0];
 } __packed;
 
 /* events */
@@ -371,6 +381,13 @@ struct gap_pairing_consent_req_ev {
 struct gap_bond_lost_ev {
 	uint8_t address_type;
 	uint8_t address[6];
+} __packed;
+
+#define GAP_EV_PAIRING_FAILED		0x8c
+struct gap_bond_pairing_failed_ev {
+	uint8_t address_type;
+	uint8_t address[6];
+	uint8_t reason;
 } __packed;
 
 /* GATT Service */
@@ -558,6 +575,12 @@ struct gatt_read_rp {
 	uint8_t data[];
 } __packed;
 
+struct gatt_char_value {
+	uint16_t handle;
+	uint8_t data_len;
+	uint8_t data[0];
+} __packed;
+
 #define GATT_READ_UUID			0x12
 struct gatt_read_uuid_cmd {
 	uint8_t address_type;
@@ -569,8 +592,8 @@ struct gatt_read_uuid_cmd {
 } __packed;
 struct gatt_read_uuid_rp {
 	uint8_t att_response;
-	uint16_t data_length;
-	uint8_t data[];
+	uint8_t values_count;
+	struct gatt_char_value values[0];
 } __packed;
 
 #define GATT_READ_LONG			0x13
@@ -700,6 +723,22 @@ struct gatt_change_db_cmd {
 	uint8_t visibility;
 } __packed;
 
+#define GATT_EATT_CONNECT		0x1f
+struct gatt_eatt_connect_cmd {
+	uint8_t address_type;
+	uint8_t address[6];
+	uint8_t num_channels;
+} __packed;
+
+#define GATT_READ_MULTIPLE_VAR		0x20
+
+#define GATT_NOTIFY_MULTIPLE		0x21
+struct gatt_cfg_notify_mult_cmd {
+	uint8_t address_type;
+	uint8_t address[6];
+	uint16_t cnt;
+	uint16_t attr_id[];
+} __packed;
 /* GATT events */
 #define GATT_EV_NOTIFICATION		0x80
 struct gatt_notification_ev {

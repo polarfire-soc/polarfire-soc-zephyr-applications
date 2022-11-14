@@ -7,12 +7,15 @@
 #define DT_DRV_COMPAT atmel_sam0_usb
 
 #define LOG_LEVEL CONFIG_USB_DRIVER_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(usb_dc_sam0);
 
-#include <usb/usb_device.h>
+#include <zephyr/kernel.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/drivers/pinctrl.h>
 #include <soc.h>
 #include <string.h>
+#include <zephyr/irq.h>
 
 #define NVM_USB_PAD_TRANSN_POS 45
 #define NVM_USB_PAD_TRANSN_SIZE 5
@@ -62,6 +65,8 @@ struct usb_sam0_data {
 };
 
 static struct usb_sam0_data usb_sam0_data_0;
+PINCTRL_DT_INST_DEFINE(0);
+static const struct pinctrl_dev_config *pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(0);
 
 static struct usb_sam0_data *usb_sam0_get_data(void)
 {
@@ -207,13 +212,14 @@ static void usb_sam0_load_padcal(void)
 		    DT_INST_IRQ_BY_IDX(0, n, priority),		\
 		    usb_sam0_isr, 0, 0);			\
 	irq_enable(DT_INST_IRQ_BY_IDX(0, n, irq));		\
-	} while (0)
+	} while (false)
 
 /* Attach by initializing the device */
 int usb_dc_attach(void)
 {
 	UsbDevice *regs = &REGS->DEVICE;
 	struct usb_sam0_data *data = usb_sam0_get_data();
+	int retval;
 
 #ifdef MCLK
 	/* Enable the clock in MCLK */
@@ -247,6 +253,11 @@ int usb_dc_attach(void)
 	regs->QOSCTRL.bit.CQOS = 2;
 	regs->QOSCTRL.bit.DQOS = 2;
 
+	retval = pinctrl_apply_state(pcfg, PINCTRL_STATE_DEFAULT);
+	if (retval < 0) {
+		return retval;
+	}
+
 	usb_sam0_load_padcal();
 
 	regs->CTRLA.reg = USB_CTRLA_MODE_DEVICE | USB_CTRLA_RUNSTDBY;
@@ -279,6 +290,31 @@ int usb_dc_attach(void)
 	return 0;
 }
 
+static void usb_dc_release_buffers(void)
+{
+	struct usb_sam0_data *data = usb_sam0_get_data();
+	UsbDeviceDescBank *bank;
+	void *buf;
+
+	/* release the buffers */
+	for (int i = 0; i < ARRAY_SIZE(data->descriptors); i++) {
+		for (int j = 0; j < ARRAY_SIZE(data->descriptors[0].DeviceDescBank); j++) {
+			bank = &data->descriptors[i].DeviceDescBank[j];
+			buf = (void *)bank->ADDR.reg;
+			/*
+			 * We free the ep descriptor memory that was
+			 * allocated in usb_dc_ep_configure().
+			 * Therefore a disabled ep must be reconfigured
+			 * before it can be enabled again.
+			 */
+			if (buf != NULL) {
+				k_free(buf);
+				bank->ADDR.reg = (uintptr_t) NULL;
+			}
+		}
+	}
+}
+
 /* Detach from the bus */
 int usb_dc_detach(void)
 {
@@ -286,6 +322,8 @@ int usb_dc_detach(void)
 
 	regs->CTRLB.bit.DETACH = 1;
 	usb_sam0_wait_syncbusy();
+
+	usb_dc_release_buffers();
 
 	return 0;
 }
@@ -304,7 +342,7 @@ int usb_dc_reset(void)
 }
 
 /* Queue a change in address.  This is processed later when the
- * current transfers are compelete.
+ * current transfers are complete.
  */
 int usb_dc_set_address(const uint8_t addr)
 {

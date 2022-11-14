@@ -27,8 +27,8 @@ import pickle
 import re
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'python-devicetree',
-                             'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'python-devicetree',
+                                'src'))
 
 from devicetree import edtlib
 
@@ -102,10 +102,22 @@ def main():
     with open(args.header_out, "w", encoding="utf-8") as header_file:
         write_top_comment(edt)
 
+        write_utils()
+
         # populate all z_path_id first so any children references will
         # work correctly.
         for node in sorted(edt.nodes, key=lambda node: node.dep_ordinal):
             node.z_path_id = node_z_path_id(node)
+
+        # Check to see if we have duplicate "zephyr,memory-region" property values.
+        regions = dict()
+        for node in sorted(edt.nodes, key=lambda node: node.dep_ordinal):
+            if 'zephyr,memory-region' in node.props:
+                region = node.props['zephyr,memory-region'].val
+                if region in regions:
+                    sys.exit(f"ERROR: Duplicate 'zephyr,memory-region' ({region}) properties "
+                             f"between {regions[region].path} and {node.path}")
+                regions[region] = node
 
         for node in sorted(edt.nodes, key=lambda node: node.dep_ordinal):
             write_node_comment(node)
@@ -122,8 +134,11 @@ def main():
                 out_dt_define(f"{node.z_path_id}_PARENT",
                               f"DT_{node.parent.z_path_id}")
 
-            write_child_functions(node)
-            write_child_functions_status_okay(node)
+                out_comment(f"Node's index in its parent's list of children:")
+                out_dt_define(f"{node.z_path_id}_CHILD_IDX",
+                              node.parent.child_index(node))
+
+            write_children(node)
             write_dep_info(node)
             write_idents_and_existence(node)
             write_bus(node)
@@ -131,36 +146,10 @@ def main():
             write_vanilla_props(node)
 
         write_chosen(edt)
-        write_global_compat_info(edt)
-
-        write_device_extern_header(args.device_header_out, edt)
+        write_global_macros(edt)
 
     if args.edt_pickle_out:
         write_pickled_edt(edt, args.edt_pickle_out)
-
-
-def write_device_extern_header(device_header_out, edt):
-    # Generate header that will extern devicetree struct device's
-
-    with open(device_header_out, "w", encoding="utf-8") as dev_header_file:
-        print("#ifndef DEVICE_EXTERN_GEN_H", file=dev_header_file)
-        print("#define DEVICE_EXTERN_GEN_H", file=dev_header_file)
-        print("", file=dev_header_file)
-        print("#ifdef __cplusplus", file=dev_header_file)
-        print('extern "C" {', file=dev_header_file)
-        print("#endif", file=dev_header_file)
-        print("", file=dev_header_file)
-
-        for node in sorted(edt.nodes, key=lambda node: node.dep_ordinal):
-            print(f"extern const struct device DEVICE_DT_NAME_GET(DT_{node.z_path_id}); /* dts_ord_{node.dep_ordinal} */",
-                  file=dev_header_file)
-
-        print("", file=dev_header_file)
-        print("#ifdef __cplusplus", file=dev_header_file)
-        print("}", file=dev_header_file)
-        print("#endif", file=dev_header_file)
-        print("", file=dev_header_file)
-        print("#endif /* DEVICE_EXTERN_GEN_H */", file=dev_header_file)
 
 
 def setup_edtlib_logging():
@@ -209,8 +198,6 @@ def parse_args():
     parser.add_argument("--dts-out", required=True,
                         help="path to write merged DTS source code to (e.g. "
                              "as a debugging aid)")
-    parser.add_argument("--device-header-out", required=True,
-                        help="path to write device struct extern header to")
     parser.add_argument("--edt-pickle-out",
                         help="path to write pickled edtlib.EDT object to")
     parser.add_argument("--vendor-prefixes", action='append', default=[],
@@ -252,6 +239,13 @@ followed by /chosen nodes.
 """
 
     out_comment(s, blank_before=False)
+
+
+def write_utils():
+    # Writes utility macros
+
+    out_comment("Used to remove brackets from around a single argument")
+    out_define("DT_DEBRACKET_INTERNAL(...)", "__VA_ARGS__")
 
 
 def write_node_comment(node):
@@ -339,11 +333,11 @@ def write_bus(node):
     if not bus:
         return
 
-    if not bus.label:
-        err(f"missing 'label' property on bus node {bus!r}")
+    out_comment(f"Bus info (controller: '{bus.path}', type: '{node.on_buses}')")
 
-    out_comment(f"Bus info (controller: '{bus.path}', type: '{node.on_bus}')")
-    out_dt_define(f"{node.z_path_id}_BUS_{str2ident(node.on_bus)}", 1)
+    for one_bus in node.on_buses:
+        out_dt_define(f"{node.z_path_id}_BUS_{str2ident(one_bus)}", 1)
+
     out_dt_define(f"{node.z_path_id}_BUS", f"DT_{bus.z_path_id}")
 
 
@@ -355,6 +349,7 @@ def write_special_props(node):
     # Macros that are special to the devicetree specification
     out_comment("Macros for properties that are special in the specification:")
     write_regs(node)
+    write_ranges(node)
     write_interrupts(node)
     write_compatibles(node)
     write_status(node)
@@ -363,6 +358,49 @@ def write_special_props(node):
     # we can't capture with the current bindings language.
     write_pinctrls(node)
     write_fixed_partitions(node)
+
+def write_ranges(node):
+    # ranges property: edtlib knows the right #address-cells and
+    # #size-cells of parent and child, and can therefore pack the
+    # child & parent addresses and sizes correctly
+
+    idx_vals = []
+    path_id = node.z_path_id
+
+    if node.ranges is not None:
+        idx_vals.append((f"{path_id}_RANGES_NUM", len(node.ranges)))
+
+    for i,range in enumerate(node.ranges):
+        idx_vals.append((f"{path_id}_RANGES_IDX_{i}_EXISTS", 1))
+
+        if "pcie" in node.buses:
+            idx_vals.append((f"{path_id}_RANGES_IDX_{i}_VAL_CHILD_BUS_FLAGS_EXISTS", 1))
+            idx_macro = f"{path_id}_RANGES_IDX_{i}_VAL_CHILD_BUS_FLAGS"
+            idx_value = range.child_bus_addr >> ((range.child_bus_cells - 1) * 32)
+            idx_vals.append((idx_macro,
+                             f"{idx_value} /* {hex(idx_value)} */"))
+        if range.child_bus_addr is not None:
+            idx_macro = f"{path_id}_RANGES_IDX_{i}_VAL_CHILD_BUS_ADDRESS"
+            if "pcie" in node.buses:
+                idx_value = range.child_bus_addr & ((1 << (range.child_bus_cells - 1) * 32) - 1)
+            else:
+                idx_value = range.child_bus_addr
+            idx_vals.append((idx_macro,
+                             f"{idx_value} /* {hex(idx_value)} */"))
+        if range.parent_bus_addr is not None:
+            idx_macro = f"{path_id}_RANGES_IDX_{i}_VAL_PARENT_BUS_ADDRESS"
+            idx_vals.append((idx_macro,
+                             f"{range.parent_bus_addr} /* {hex(range.parent_bus_addr)} */"))
+        if range.length is not None:
+            idx_macro = f"{path_id}_RANGES_IDX_{i}_VAL_LENGTH"
+            idx_vals.append((idx_macro,
+                             f"{range.length} /* {hex(range.length)} */"))
+
+    for macro, val in idx_vals:
+        out_dt_define(macro, val)
+
+    out_dt_define(f"{path_id}_FOREACH_RANGE(fn)",
+            " ".join(f"fn(DT_{path_id}, {i})" for i,range in enumerate(node.ranges)))
 
 def write_regs(node):
     # reg property: edtlib knows the right #address-cells and
@@ -472,38 +510,56 @@ def write_compatibles(node):
     # about whether edtlib / Zephyr's binding language recognizes
     # them. The compatibles the node provides are what is important.
 
-    for compat in node.compats:
+    for i, compat in enumerate(node.compats):
         out_dt_define(
             f"{node.z_path_id}_COMPAT_MATCHES_{str2ident(compat)}", 1)
 
+        if node.edt.compat2vendor[compat]:
+            out_dt_define(f"{node.z_path_id}_COMPAT_VENDOR_IDX_{i}_EXISTS", 1)
+            out_dt_define(f"{node.z_path_id}_COMPAT_VENDOR_IDX_{i}",
+                          quote_str(node.edt.compat2vendor[compat]))
 
-def write_child_functions(node):
-    # Writes macro that are helpers that will call a macro/function
-    # for each child node.
+        if node.edt.compat2model[compat]:
+            out_dt_define(f"{node.z_path_id}_COMPAT_MODEL_IDX_{i}_EXISTS", 1)
+            out_dt_define(f"{node.z_path_id}_COMPAT_MODEL_IDX_{i}",
+                          quote_str(node.edt.compat2model[compat]))
+
+def write_children(node):
+    # Writes helper macros for dealing with node's children.
+
+    out_comment("Helper macros for child nodes of this node.")
 
     out_dt_define(f"{node.z_path_id}_FOREACH_CHILD(fn)",
             " ".join(f"fn(DT_{child.z_path_id})" for child in
                 node.children.values()))
 
+    out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_SEP(fn, sep)",
+            " DT_DEBRACKET_INTERNAL sep ".join(f"fn(DT_{child.z_path_id})"
+            for child in node.children.values()))
+
     out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_VARGS(fn, ...)",
-            " ".join(f"fn(DT_{child.z_path_id}, __VA_ARGS__)" for child in
-                node.children.values()))
+            " ".join(f"fn(DT_{child.z_path_id}, __VA_ARGS__)"
+            for child in node.children.values()))
 
-def write_child_functions_status_okay(node):
-    # Writes macros that are helpers that will call a macro/function
-    # for each child node with status "okay".
+    out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_SEP_VARGS(fn, sep, ...)",
+            " DT_DEBRACKET_INTERNAL sep ".join(f"fn(DT_{child.z_path_id}, __VA_ARGS__)"
+            for child in node.children.values()))
 
-    functions = ''
-    functions_args = ''
-    for child in node.children.values():
-        if child.status == "okay":
-            functions = functions + f"fn(DT_{child.z_path_id}) "
-            functions_args = functions_args + f"fn(DT_{child.z_path_id}, " \
-                                                            "__VA_ARGS__) "
+    out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_STATUS_OKAY(fn)",
+            " ".join(f"fn(DT_{child.z_path_id})"
+            for child in node.children.values() if child.status == "okay"))
 
-    out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_STATUS_OKAY(fn)", functions)
+    out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_STATUS_OKAY_SEP(fn, sep)",
+            " DT_DEBRACKET_INTERNAL sep ".join(f"fn(DT_{child.z_path_id})"
+            for child in node.children.values() if child.status == "okay"))
+
     out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_STATUS_OKAY_VARGS(fn, ...)",
-                                                                functions_args)
+            " ".join(f"fn(DT_{child.z_path_id}, __VA_ARGS__)"
+            for child in node.children.values() if child.status == "okay"))
+
+    out_dt_define(f"{node.z_path_id}_FOREACH_CHILD_STATUS_OKAY_SEP_VARGS(fn, sep, ...)",
+            " DT_DEBRACKET_INTERNAL sep ".join(f"fn(DT_{child.z_path_id}, __VA_ARGS__)"
+            for child in node.children.values() if child.status == "okay"))
 
 
 def write_status(node):
@@ -599,6 +655,9 @@ def write_vanilla_props(node):
             for i, subval in enumerate(prop.val):
                 if isinstance(subval, str):
                     macro2val[macro + f"_IDX_{i}"] = quote_str(subval)
+                    subval_as_token = edtlib.str_as_token(subval)
+                    macro2val[macro + f"_IDX_{i}_STRING_TOKEN"] = subval_as_token
+                    macro2val[macro + f"_IDX_{i}_STRING_UPPER_TOKEN"] = subval_as_token.upper()
                 else:
                     macro2val[macro + f"_IDX_{i}"] = subval
                 macro2val[macro + f"_IDX_{i}_EXISTS"] = 1
@@ -606,13 +665,24 @@ def write_vanilla_props(node):
         if prop.type in FOREACH_PROP_ELEM_TYPES:
             # DT_N_<node-id>_P_<prop-id>_FOREACH_PROP_ELEM
             macro2val[f"{macro}_FOREACH_PROP_ELEM(fn)"] = \
-                ' \\\n\t'.join(f'fn(DT_{node.z_path_id}, {prop_id}, {i})'
-                              for i in range(len(prop.val)))
+                ' \\\n\t'.join(
+                    f'fn(DT_{node.z_path_id}, {prop_id}, {i})'
+                    for i in range(len(prop.val)))
+
+            macro2val[f"{macro}_FOREACH_PROP_ELEM_SEP(fn, sep)"] = \
+                ' DT_DEBRACKET_INTERNAL sep \\\n\t'.join(
+                    f'fn(DT_{node.z_path_id}, {prop_id}, {i})'
+                    for i in range(len(prop.val)))
 
             macro2val[f"{macro}_FOREACH_PROP_ELEM_VARGS(fn, ...)"] = \
-                ' \\\n\t'.join(f'fn(DT_{node.z_path_id}, {prop_id}, {i},'
-                                ' __VA_ARGS__)'
-                              for i in range(len(prop.val)))
+                ' \\\n\t'.join(
+                    f'fn(DT_{node.z_path_id}, {prop_id}, {i}, __VA_ARGS__)'
+                    for i in range(len(prop.val)))
+
+            macro2val[f"{macro}_FOREACH_PROP_ELEM_SEP_VARGS(fn, sep, ...)"] = \
+                ' DT_DEBRACKET_INTERNAL sep \\\n\t'.join(
+                    f'fn(DT_{node.z_path_id}, {prop_id}, {i}, __VA_ARGS__)'
+                    for i in range(len(prop.val)))
 
         plen = prop_len(prop)
         if plen is not None:
@@ -682,10 +752,12 @@ def prop_len(prop):
     # Returns the property's length if and only if we should generate
     # a _LEN macro for the property. Otherwise, returns None.
     #
-    # This deliberately excludes reg and interrupts.
+    # This deliberately excludes ranges, dma-ranges, reg and interrupts.
     # While they have array type, their lengths as arrays are
     # basically nonsense semantically due to #address-cells and
-    # #size-cells for "reg" and #interrupt-cells for "interrupts".
+    # #size-cells for "reg", #interrupt-cells for "interrupts"
+    # and #address-cells, #size-cells and the #address-cells from the
+    # parent node for "ranges" and "dma-ranges".
     #
     # We have special purpose macros for the number of register blocks
     # / interrupt specifiers. Excluding them from this list means
@@ -698,7 +770,7 @@ def prop_len(prop):
 
     if (prop.type in ["array", "uint8-array", "string-array",
                       "phandles", "phandle-array"] and
-                prop.name not in ["reg", "interrupts"]):
+                prop.name not in ["ranges", "dma-ranges", "reg", "interrupts"]):
         return len(prop.val)
 
     return None
@@ -798,18 +870,27 @@ def write_chosen(edt):
         out_define(macro, value, width=max_len)
 
 
-def write_global_compat_info(edt):
-    # Tree-wide information related to each compatible, such as number
-    # of instances with status "okay", is printed here.
+def write_global_macros(edt):
+    # Global or tree-wide information, such as number of instances
+    # with status "okay" for each compatible, is printed here.
+
+
+    out_comment("Macros for iterating over all nodes and enabled nodes")
+    out_dt_define("FOREACH_HELPER(fn)",
+                  " ".join(f"fn(DT_{node.z_path_id})" for node in edt.nodes))
+    out_dt_define("FOREACH_OKAY_HELPER(fn)",
+                  " ".join(f"fn(DT_{node.z_path_id})" for node in edt.nodes
+                           if node.status == "okay"))
 
     n_okay_macros = {}
     for_each_macros = {}
     compat2buses = defaultdict(list)  # just for "okay" nodes
     for compat, okay_nodes in edt.compat2okay.items():
         for node in okay_nodes:
-            bus = node.on_bus
-            if bus is not None and bus not in compat2buses[compat]:
-                compat2buses[compat].append(bus)
+            buses = node.on_buses
+            for bus in buses:
+                if bus is not None and bus not in compat2buses[compat]:
+                    compat2buses[compat].append(bus)
 
         ident = str2ident(compat)
         n_okay_macros[f"DT_N_INST_{ident}_NUM_OKAY"] = len(okay_nodes)

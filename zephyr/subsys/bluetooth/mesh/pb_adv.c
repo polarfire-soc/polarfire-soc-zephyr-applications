@@ -6,9 +6,9 @@
  */
 #include <stdint.h>
 #include <string.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/mesh.h>
-#include <net/buf.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/mesh.h>
+#include <zephyr/net/buf.h>
 #include "host/testing.h"
 #include "net.h"
 #include "adv.h"
@@ -20,6 +20,7 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_PROV)
 #define LOG_MODULE_NAME bt_mesh_pb_adv
 #include "common/log.h"
+#include "common/bt_str.h"
 
 #define GPCF(gpc)           (gpc & 0x03)
 #define GPC_START(last_seg) (((last_seg) << 2) | 0x00)
@@ -29,6 +30,7 @@
 
 #define START_PAYLOAD_MAX 20
 #define CONT_PAYLOAD_MAX  23
+#define RX_BUFFER_MAX     65
 
 #define START_LAST_SEG(gpc) (gpc >> 2)
 #define CONT_SEG_INDEX(gpc) (gpc >> 2)
@@ -38,7 +40,8 @@
 #define LINK_ACK        0x01
 #define LINK_CLOSE      0x02
 
-#define XACT_SEG_DATA(_seg) (&link.rx.buf->data[20 + ((_seg - 1) * 23)])
+#define XACT_SEG_OFFSET(_seg) (20 + ((_seg - 1) * 23))
+#define XACT_SEG_DATA(_seg) (&link.rx.buf->data[XACT_SEG_OFFSET(_seg)])
 #define XACT_SEG_RECV(_seg) (link.rx.seg &= ~(1 << (_seg)))
 
 #define XACT_ID_MAX  0x7f
@@ -116,7 +119,7 @@ struct prov_rx {
 	uint8_t gpc;
 };
 
-NET_BUF_SIMPLE_DEFINE_STATIC(rx_buf, 65);
+NET_BUF_SIMPLE_DEFINE_STATIC(rx_buf, RX_BUFFER_MAX);
 
 static struct pb_adv link = { .rx = { .buf = &rx_buf } };
 
@@ -147,7 +150,7 @@ static struct bt_mesh_send_cb buf_sent_cb = {
 	.end = buf_sent,
 };
 
-static uint8_t last_seg(uint8_t len)
+static uint8_t last_seg(uint16_t len)
 {
 	if (len <= START_PAYLOAD_MAX) {
 		return 0;
@@ -212,7 +215,13 @@ static void reset_adv_link(void)
 		(void)memset(&link, 0, offsetof(struct pb_adv, tx.retransmit));
 		link.rx.id = XACT_ID_NVAL;
 	} else {
-		/* Accept another provisioning attempt */
+		/* If provisioned, reset the link callback to stop receiving provisioning advs,
+		 * otherwise keep the callback to accept another provisioning attempt.
+		 */
+		if (bt_mesh_is_provisioned()) {
+			link.cb = NULL;
+		}
+
 		link.id = 0;
 		atomic_clear(link.flags);
 		link.rx.id = XACT_ID_MAX;
@@ -230,14 +239,14 @@ static void close_link(enum prov_bearer_link_status reason)
 	void *cb_data = link.cb_data;
 
 	reset_adv_link();
-	cb->link_closed(&pb_adv, cb_data, reason);
+	cb->link_closed(&bt_mesh_pb_adv, cb_data, reason);
 }
 
 static struct net_buf *adv_buf_create(uint8_t retransmits)
 {
 	struct net_buf *buf;
 
-	buf = bt_mesh_adv_create(BT_MESH_ADV_PROV,
+	buf = bt_mesh_adv_create(BT_MESH_ADV_PROV, BT_MESH_LOCAL_ADV,
 				 BT_MESH_TRANSMIT(retransmits, 20),
 				 BUF_TIMEOUT);
 	if (!buf) {
@@ -262,7 +271,7 @@ static bool ack_pending(void)
 static void prov_failed(uint8_t err)
 {
 	BT_DBG("%u", err);
-	link.cb->error(&pb_adv, link.cb_data, err);
+	link.cb->error(&bt_mesh_pb_adv, link.cb_data, err);
 	atomic_set_bit(link.flags, ADV_LINK_INVALID);
 }
 
@@ -284,7 +293,7 @@ static void prov_msg_recv(void)
 		return;
 	}
 
-	link.cb->recv(&pb_adv, link.cb_data, link.rx.buf);
+	link.cb->recv(&bt_mesh_pb_adv, link.cb_data, link.rx.buf);
 }
 
 static void protocol_timeout(struct k_work *work)
@@ -383,6 +392,11 @@ static void gen_prov_cont(struct prov_rx *rx, struct net_buf_simple *buf)
 		return;
 	}
 
+	if (XACT_SEG_OFFSET(seg) + buf->len > RX_BUFFER_MAX) {
+		BT_WARN("Rx buffer overflow. Malformed generic prov frame?");
+		return;
+	}
+
 	memcpy(XACT_SEG_DATA(seg), buf->data, buf->len);
 	XACT_SEG_RECV(seg);
 
@@ -471,6 +485,13 @@ static void gen_prov_start(struct prov_rx *rx, struct net_buf_simple *buf)
 
 	if (START_LAST_SEG(rx->gpc) > 0 && link.rx.buf->len <= 20U) {
 		BT_ERR("Too small total length for multi-segment PDU");
+		prov_failed(PROV_ERR_NVAL_FMT);
+		return;
+	}
+
+	if (START_LAST_SEG(rx->gpc) != last_seg(link.rx.buf->len)) {
+		BT_ERR("Invalid SegN (%u, calculated %u)", START_LAST_SEG(rx->gpc),
+		       last_seg(link.rx.buf->len));
 		prov_failed(PROV_ERR_NVAL_FMT);
 		return;
 	}
@@ -766,7 +787,7 @@ static void link_open(struct prov_rx *rx, struct net_buf_simple *buf)
 		return;
 	}
 
-	link.cb->link_opened(&pb_adv, link.cb_data);
+	link.cb->link_opened(&bt_mesh_pb_adv, link.cb_data);
 }
 
 static void link_ack(struct prov_rx *rx, struct net_buf_simple *buf)
@@ -780,7 +801,7 @@ static void link_ack(struct prov_rx *rx, struct net_buf_simple *buf)
 
 		prov_clear_tx();
 
-		link.cb->link_opened(&pb_adv, link.cb_data);
+		link.cb->link_opened(&bt_mesh_pb_adv, link.cb_data);
 	}
 }
 
@@ -874,7 +895,7 @@ static int prov_link_accept(const struct prov_bearer_cb *cb, void *cb_data)
 	link.cb = cb;
 	link.cb_data = cb_data;
 
-	/* Make sure we're scanning for provisioning inviations */
+	/* Make sure we're scanning for provisioning invitations */
 	bt_mesh_scan_enable();
 	/* Enable unprovisioned beacon sending */
 	bt_mesh_beacon_enable();
@@ -892,18 +913,18 @@ static void prov_link_close(enum prov_bearer_link_status status)
 	bearer_ctl_send_unacked(ctl_buf_create(LINK_CLOSE, &status, 1, RETRANSMITS_LINK_CLOSE));
 }
 
-void pb_adv_init(void)
+void bt_mesh_pb_adv_init(void)
 {
 	k_work_init_delayable(&link.prot_timer, protocol_timeout);
 	k_work_init_delayable(&link.tx.retransmit, prov_retransmit);
 }
 
-void pb_adv_reset(void)
+void bt_mesh_pb_adv_reset(void)
 {
 	reset_adv_link();
 }
 
-const struct prov_bearer pb_adv = {
+const struct prov_bearer bt_mesh_pb_adv = {
 	.type = BT_MESH_PROV_ADV,
 	.link_open = prov_link_open,
 	.link_accept = prov_link_accept,

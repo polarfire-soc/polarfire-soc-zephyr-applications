@@ -6,13 +6,14 @@
 
 #define DT_DRV_COMPAT microchip_xec_qmspi
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(spi_xec, CONFIG_SPI_LOG_LEVEL);
 
 #include "spi_context.h"
 #include <errno.h>
-#include <device.h>
-#include <drivers/spi.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/pinctrl.h>
 #include <soc.h>
 
 /* Device constant configuration parameters */
@@ -26,6 +27,8 @@ struct spi_qmspi_config {
 	uint8_t irq_pri;
 	uint8_t chip_sel;
 	uint8_t width;	/* 1(single), 2(dual), 4(quad) */
+	uint8_t unused;
+	const struct pinctrl_dev_config *pcfg;
 };
 
 /* Device run time data */
@@ -89,7 +92,7 @@ static void qmspi_set_frequency(QMSPI_Type *regs, uint32_t freq_hz)
  * SPI signalling mode: CPOL and CPHA
  * CPOL = 0 is clock idles low, 1 is clock idle high
  * CPHA = 0 Transmitter changes data on trailing of preceding clock cycle.
- *          Receiver samples data on leading edge of clock cyle.
+ *          Receiver samples data on leading edge of clock cycle.
  *        1 Transmitter changes data on leading edge of current clock cycle.
  *          Receiver samples data on the trailing edge of clock cycle.
  * SPI Mode nomenclature:
@@ -138,6 +141,7 @@ static void qmspi_set_signalling_mode(QMSPI_Type *regs, uint32_t smode)
  */
 static uint32_t qmspi_config_get_lines(const struct spi_config *config)
 {
+#ifdef CONFIG_SPI_EXTENDED_MODES
 	uint32_t qlines;
 
 	switch (config->operation & SPI_LINES_MASK) {
@@ -159,6 +163,9 @@ static uint32_t qmspi_config_get_lines(const struct spi_config *config)
 	}
 
 	return qlines;
+#else
+	return MCHP_QMSPI_C_IFM_1X;
+#endif
 }
 
 /*
@@ -175,6 +182,10 @@ static int qmspi_configure(const struct device *dev,
 
 	if (spi_context_configured(&data->ctx, config)) {
 		return 0;
+	}
+
+	if (config->operation & SPI_HALF_DUPLEX) {
+		return -ENOTSUP;
 	}
 
 	if (config->operation & (SPI_TRANSFER_LSB | SPI_OP_MODE_SLAVE
@@ -221,9 +232,6 @@ static int qmspi_configure(const struct device *dev,
 
 	data->ctx.config = config;
 
-	/* Add driver specific data to SPI context structure */
-	spi_context_cs_configure(&data->ctx);
-
 	regs->MODE |= MCHP_QMSPI_M_ACTIVATE;
 
 	return 0;
@@ -234,7 +242,7 @@ static int qmspi_configure(const struct device *dev,
  * SPI clocks with I/O pins tri-stated.
  * Single mode: 1 bit per clock -> IFM field = 00b. Max 0x7fff clocks
  * Dual mode: 2 bits per clock  -> IFM field = 01b. Max 0x3fff clocks
- * Quad mode: 4 bits per clock  -> IFM fiels = 1xb. Max 0x1fff clocks
+ * Quad mode: 4 bits per clock  -> IFM field = 1xb. Max 0x1fff clocks
  * QMSPI unit size set to bits.
  */
 static int qmspi_tx_dummy_clocks(QMSPI_Type *regs, uint32_t nclocks)
@@ -517,7 +525,7 @@ static int qmspi_transceive(const struct device *dev,
 	uint32_t descr, last_didx;
 	int err;
 
-	spi_context_lock(&data->ctx, false, NULL, config);
+	spi_context_lock(&data->ctx, false, NULL, NULL, config);
 
 	err = qmspi_configure(dev, config);
 	if (err != 0) {
@@ -616,9 +624,17 @@ static int qmspi_release(const struct device *dev,
  */
 static int qmspi_init(const struct device *dev)
 {
+	int err;
 	const struct spi_qmspi_config *cfg = dev->config;
 	struct spi_qmspi_data *data = dev->data;
 	QMSPI_Type *regs = cfg->regs;
+	int ret;
+
+	ret = pinctrl_apply_state(cfg->pcfg, PINCTRL_STATE_DEFAULT);
+	if (ret != 0) {
+		LOG_ERR("QSPI pinctrl setup failed (%d)", ret);
+		return ret;
+	}
 
 	mchp_pcr_periph_slp_ctrl(PCR_QMSPI, MCHP_PCR_SLEEP_DIS);
 
@@ -629,6 +645,11 @@ static int qmspi_init(const struct device *dev)
 
 	MCHP_GIRQ_BLK_CLREN(cfg->girq);
 	NVIC_ClearPendingIRQ(cfg->girq_nvic_direct);
+
+	err = spi_context_cs_configure_all(&data->ctx);
+	if (err < 0) {
+		return err;
+	}
 
 	spi_context_unlock_unconditionally(&data->ctx);
 
@@ -658,6 +679,8 @@ static const struct spi_driver_api spi_qmspi_driver_api = {
 
 #if DT_NODE_HAS_STATUS(DT_INST(0, microchip_xec_qmspi), okay)
 
+PINCTRL_DT_INST_DEFINE(0);
+
 static const struct spi_qmspi_config spi_qmspi_0_config = {
 	.regs = (QMSPI_Type *)DT_INST_REG_ADDR(0),
 	.cs_timing = XEC_QMSPI_0_CS_TIMING,
@@ -666,12 +689,14 @@ static const struct spi_qmspi_config spi_qmspi_0_config = {
 	.girq_nvic_direct = MCHP_QMSPI_GIRQ_NVIC_DIRECT,
 	.irq_pri = DT_INST_IRQ(0, priority),
 	.chip_sel = DT_INST_PROP(0, chip_select),
-	.width = DT_INST_PROP(0, lines)
+	.width = DT_INST_PROP(0, lines),
+	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(0),
 };
 
 static struct spi_qmspi_data spi_qmspi_0_dev_data = {
 	SPI_CONTEXT_INIT_LOCK(spi_qmspi_0_dev_data, ctx),
-	SPI_CONTEXT_INIT_SYNC(spi_qmspi_0_dev_data, ctx)
+	SPI_CONTEXT_INIT_SYNC(spi_qmspi_0_dev_data, ctx),
+	SPI_CONTEXT_CS_GPIOS_INITIALIZE(DT_DRV_INST(0), ctx)
 };
 
 DEVICE_DT_INST_DEFINE(0,

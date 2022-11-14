@@ -10,35 +10,26 @@
 #define FLASH_WRITE_BLK_SZ DT_PROP(SOC_NV_FLASH_NODE, write_block_size)
 #define FLASH_ERASE_BLK_SZ DT_PROP(SOC_NV_FLASH_NODE, erase_block_size)
 
-#include <device.h>
-#include <drivers/flash.h>
-#include <init.h>
-#include <kernel.h>
-#include <linker/linker-defs.h>
-#include <soc.h>
 #include <string.h>
 
+#include <zephyr/device.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/linker/linker-defs.h>
+
+#include <ilm.h>
+#include <soc.h>
+
 #define LOG_LEVEL CONFIG_FLASH_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(flash_ite_it8xxx2);
 
-/* RAM code start address */
-extern char _ram_code_start;
-#define FLASH_RAMCODE_START ((uint32_t)&_ram_code_start)
-#define	FLASH_RAMCODE_START_BIT19      BIT(19)
-/* RAM code section */
-#define __ram_code __attribute__((section(".__ram_code")))
-
 #define FLASH_IT8XXX2_REG_BASE \
-		((struct flash_it8xxx2_regs *)DT_INST_REG_ADDR(0))
-
-#define DEV_DATA(dev) \
-	((struct flash_it8xxx2_dev_data *const)(dev)->data)
+		((struct smfi_it8xxx2_regs *)DT_INST_REG_ADDR(0))
 
 struct flash_it8xxx2_dev_data {
 	struct k_sem sem;
-	int all_protected;
-	int flash_static_cache_enabled;
 };
 
 /*
@@ -52,8 +43,6 @@ struct flash_it8xxx2_dev_data {
 #define CHIP_FLASH_SIZE_BYTES          DT_REG_SIZE(DT_NODELABEL(flash0))
 /* protect bank size */
 #define CHIP_FLASH_BANK_SIZE           0x00001000
-/* base+0000h~base+0FFF */
-#define CHIP_RAMCODE_BASE              0x80100000
 
 /*
  * This is the block size of the ILM on the it8xxx2 chip.
@@ -64,7 +53,7 @@ struct flash_it8xxx2_dev_data {
 
 /* page program command  */
 #define FLASH_CMD_PAGE_WRITE   0x2
-/* ector erase command (erase size is 4KB) */
+/* sector erase command (erase size is 4KB) */
 #define FLASH_CMD_SECTOR_ERASE 0x20
 /* command for flash write */
 #define FLASH_CMD_WRITE        FLASH_CMD_PAGE_WRITE
@@ -81,15 +70,6 @@ struct flash_it8xxx2_dev_data {
 #define FLASH_FSCE_HIGH_ADDRESS        0x0FFFFE00
 /* Set FSCE# as low level by writing data to address xfff_fd00h */
 #define FLASH_FSCE_LOW_ADDRESS         0x0FFFFD00
-
-#define FWP_REG(bank) (bank / 8)
-#define FWP_MASK(bank) (1 << (bank % 8))
-
-enum flash_wp_interface {
-	FLASH_WP_HOST = 0x01,
-	FLASH_WP_DBGR = 0x02,
-	FLASH_WP_EC = 0x04,
-};
 
 enum flash_status_mask {
 	FLASH_SR_NO_BUSY = 0,
@@ -111,20 +91,22 @@ static const struct flash_parameters flash_it8xxx2_parameters = {
 	.erase_value = 0xff,
 };
 
-void __ram_code ramcode_reset_i_cache(void)
+void __soc_ram_code ramcode_reset_i_cache(void)
 {
+	struct gctrl_it8xxx2_regs *const gctrl_regs = GCTRL_IT8XXX2_REGS_BASE;
+
 	/* I-Cache tag sram reset */
-	IT83XX_GCTRL_MCCR |= IT83XX_GCTRL_ICACHE_RESET;
+	gctrl_regs->GCTRL_MCCR |= IT8XXX2_GCTRL_ICACHE_RESET;
 	/* Make sure the I-Cache is reset */
 	__asm__ volatile ("fence.i" ::: "memory");
 
-	IT83XX_GCTRL_MCCR &= ~IT83XX_GCTRL_ICACHE_RESET;
+	gctrl_regs->GCTRL_MCCR &= ~IT8XXX2_GCTRL_ICACHE_RESET;
 	__asm__ volatile ("fence.i" ::: "memory");
 }
 
-void __ram_code ramcode_flash_follow_mode(void)
+void __soc_ram_code ramcode_flash_follow_mode(void)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
 	/*
 	 * ECINDAR3-0 are EC-indirect memory address registers.
 	 *
@@ -143,18 +125,19 @@ void __ram_code ramcode_flash_follow_mode(void)
 	flash_regs->SMFI_ECINDDR = 0x00;
 }
 
-void __ram_code ramcode_flash_follow_mode_exit(void)
+void __soc_ram_code ramcode_flash_follow_mode_exit(void)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
 
 	/* Exit follow mode, and keep the setting of selecting internal flash */
 	flash_regs->SMFI_ECINDAR3 = EC_INDIRECT_READ_INTERNAL_FLASH;
 	flash_regs->SMFI_ECINDAR2 = 0x00;
 }
 
-void __ram_code ramcode_flash_fsce_high(void)
+void __soc_ram_code ramcode_flash_fsce_high(void)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct gctrl_it8xxx2_regs *const gctrl_regs = GCTRL_IT8XXX2_REGS_BASE;
 
 	/* FSCE# high level */
 	flash_regs->SMFI_ECINDAR1 = (FLASH_FSCE_HIGH_ADDRESS >> 8) & GENMASK(7, 0);
@@ -168,26 +151,25 @@ void __ram_code ramcode_flash_fsce_high(void)
 	 * So we perform 2 consecutive writes to WNCKR here to ensure the
 	 * minimum delay is 15us.
 	 */
-	IT83XX_GCTRL_WNCKR = 0;
-	IT83XX_GCTRL_WNCKR = 0;
+	gctrl_regs->GCTRL_WNCKR = 0;
+	gctrl_regs->GCTRL_WNCKR = 0;
 
 	/* Writing 0 to EC-indirect memory data register */
 	flash_regs->SMFI_ECINDDR = 0x00;
 }
 
-void __ram_code ramcode_flash_write_dat(uint8_t wdata)
+void __soc_ram_code ramcode_flash_write_dat(uint8_t wdata)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
 
 	/* Write data to FMOSI */
 	flash_regs->SMFI_ECINDDR = wdata;
 }
 
-void __ram_code ramcode_flash_transaction(int wlen, uint8_t *wbuf, int rlen,
-					  uint8_t *rbuf,
-					  enum flash_transaction_cmd cmd_end)
+void __soc_ram_code ramcode_flash_transaction(int wlen, uint8_t *wbuf, int rlen, uint8_t *rbuf,
+					      enum flash_transaction_cmd cmd_end)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
 	int i;
 
 	/*  FSCE# with low level */
@@ -206,10 +188,10 @@ void __ram_code ramcode_flash_transaction(int wlen, uint8_t *wbuf, int rlen,
 	}
 }
 
-void __ram_code ramcode_flash_cmd_read_status(enum flash_status_mask mask,
-					      enum flash_status_mask target)
+void __soc_ram_code ramcode_flash_cmd_read_status(enum flash_status_mask mask,
+						  enum flash_status_mask target)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
 	uint8_t cmd_rs[] = {FLASH_CMD_RS};
 
 	/* Send read status command */
@@ -231,7 +213,7 @@ void __ram_code ramcode_flash_cmd_read_status(enum flash_status_mask mask,
 	ramcode_flash_fsce_high();
 }
 
-void __ram_code ramcode_flash_cmd_write_enable(void)
+void __soc_ram_code ramcode_flash_cmd_write_enable(void)
 {
 	uint8_t cmd_we[] = {FLASH_CMD_WREN};
 
@@ -245,7 +227,7 @@ void __ram_code ramcode_flash_cmd_write_enable(void)
 	ramcode_flash_follow_mode_exit();
 }
 
-void __ram_code ramcode_flash_cmd_write_disable(void)
+void __soc_ram_code ramcode_flash_cmd_write_disable(void)
 {
 	uint8_t cmd_wd[] = {FLASH_CMD_WRDI};
 
@@ -259,21 +241,21 @@ void __ram_code ramcode_flash_cmd_write_disable(void)
 	ramcode_flash_follow_mode_exit();
 }
 
-int __ram_code ramcode_flash_verify(int addr, int size, const char *data)
+int __soc_ram_code ramcode_flash_verify(int addr, int size, const char *data)
 {
 	int i;
 	uint8_t *wbuf = (uint8_t *)data;
 	uint8_t *flash = (uint8_t *)addr;
 
-	/* verify for erase */
 	if (data == NULL) {
+		/* verify for erase */
 		for (i = 0; i < size; i++) {
 			if (flash[i] != 0xFF) {
 				return -EINVAL;
 			}
 		}
-	/* verify for write */
 	} else {
+		/* verify for write */
 		for (i = 0; i < size; i++) {
 			if (flash[i] != wbuf[i]) {
 				return -EINVAL;
@@ -284,7 +266,7 @@ int __ram_code ramcode_flash_verify(int addr, int size, const char *data)
 	return 0;
 }
 
-void __ram_code ramcode_flash_cmd_write(int addr, int wlen, uint8_t *wbuf)
+void __soc_ram_code ramcode_flash_cmd_write(int addr, int wlen, uint8_t *wbuf)
 {
 	int i;
 	uint8_t flash_write[] = {FLASH_CMD_WRITE, ((addr >> 16) & 0xFF),
@@ -328,14 +310,14 @@ void __ram_code ramcode_flash_cmd_write(int addr, int wlen, uint8_t *wbuf)
 	ramcode_flash_follow_mode_exit();
 }
 
-void __ram_code ramcode_flash_write(int addr, int wlen, const char *wbuf)
+void __soc_ram_code ramcode_flash_write(int addr, int wlen, const char *wbuf)
 {
 	ramcode_flash_cmd_write_enable();
 	ramcode_flash_cmd_write(addr, wlen, (uint8_t *)wbuf);
 	ramcode_flash_cmd_write_disable();
 }
 
-void __ram_code ramcode_flash_cmd_erase(int addr, int cmd)
+void __soc_ram_code ramcode_flash_cmd_erase(int addr, int cmd)
 {
 	uint8_t cmd_erase[] = {cmd, ((addr >> 16) & 0xFF),
 		((addr >> 8) & 0xFF), (addr & 0xFF)};
@@ -350,42 +332,18 @@ void __ram_code ramcode_flash_cmd_erase(int addr, int cmd)
 	ramcode_flash_follow_mode_exit();
 }
 
-void __ram_code ramcode_flash_erase(int addr, int cmd)
+void __soc_ram_code ramcode_flash_erase(int addr, int cmd)
 {
 	ramcode_flash_cmd_write_enable();
 	ramcode_flash_cmd_erase(addr, cmd);
 	ramcode_flash_cmd_write_disable();
 }
 
-/**
- * Protect flash banks until reboot.
- *
- * @param start_bank    Start bank to protect
- * @param bank_count    Number of banks to protect
- */
-static void flash_protect_banks(int start_bank, int bank_count,
-				enum flash_wp_interface wp_if)
-{
-	int bank;
-
-	for (bank = start_bank; bank < start_bank + bank_count; bank++) {
-		if (wp_if & FLASH_WP_EC) {
-			IT83XX_GCTRL_EWPR0PFEC(FWP_REG(bank)) |= FWP_MASK(bank);
-		}
-		if (wp_if & FLASH_WP_HOST) {
-			IT83XX_GCTRL_EWPR0PFH(FWP_REG(bank)) |= FWP_MASK(bank);
-		}
-		if (wp_if & FLASH_WP_DBGR) {
-			IT83XX_GCTRL_EWPR0PFD(FWP_REG(bank)) |= FWP_MASK(bank);
-		}
-	}
-}
-
 /* Read data from flash */
-static int __ram_code flash_it8xxx2_read(const struct device *dev, off_t offset,
-					 void *data, size_t len)
+static int __soc_ram_code flash_it8xxx2_read(const struct device *dev, off_t offset, void *data,
+					     size_t len)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
 	uint8_t *data_t = data;
 	int i;
 
@@ -408,10 +366,10 @@ static int __ram_code flash_it8xxx2_read(const struct device *dev, off_t offset,
 }
 
 /* Write data to the flash, page by page */
-static int __ram_code flash_it8xxx2_write(const struct device *dev, off_t offset,
-					  const void *src_data, size_t len)
+static int __soc_ram_code flash_it8xxx2_write(const struct device *dev, off_t offset,
+					      const void *src_data, size_t len)
 {
-	struct flash_it8xxx2_dev_data *data = DEV_DATA(dev);
+	struct flash_it8xxx2_dev_data *data = dev->data;
 	int ret = -EINVAL;
 	unsigned int key;
 
@@ -425,10 +383,7 @@ static int __ram_code flash_it8xxx2_write(const struct device *dev, off_t offset
 	if ((len % FLASH_WRITE_BLK_SZ) != 0) {
 		return -EINVAL;
 	}
-	if (data->flash_static_cache_enabled == 0) {
-		return -EACCES;
-	}
-	if (data->all_protected) {
+	if (!it8xxx2_is_ilm_configured()) {
 		return -EACCES;
 	}
 
@@ -454,10 +409,9 @@ static int __ram_code flash_it8xxx2_write(const struct device *dev, off_t offset
 }
 
 /* Erase multiple blocks */
-static int __ram_code flash_it8xxx2_erase(const struct device *dev,
-					  off_t offset, size_t len)
+static int __soc_ram_code flash_it8xxx2_erase(const struct device *dev, off_t offset, size_t len)
 {
-	struct flash_it8xxx2_dev_data *data = DEV_DATA(dev);
+	struct flash_it8xxx2_dev_data *data = dev->data;
 	int v_size = len, v_addr = offset, ret = -EINVAL;
 	unsigned int key;
 
@@ -471,10 +425,7 @@ static int __ram_code flash_it8xxx2_erase(const struct device *dev,
 	if ((len % FLASH_ERASE_BLK_SZ) != 0) {
 		return -EINVAL;
 	}
-	if (data->flash_static_cache_enabled == 0) {
-		return -EACCES;
-	}
-	if (data->all_protected) {
+	if (!it8xxx2_is_ilm_configured()) {
 		return -EACCES;
 	}
 
@@ -503,30 +454,6 @@ static int __ram_code flash_it8xxx2_erase(const struct device *dev,
 	return ret;
 }
 
-/* Enable or disable the write protection */
-static int flash_it8xxx2_write_protection(const struct device *dev,
-					  bool enable)
-{
-	struct flash_it8xxx2_dev_data *data = DEV_DATA(dev);
-
-	if (enable) {
-		/* Protect the entire flash */
-		flash_protect_banks(0, CHIP_FLASH_SIZE_BYTES /
-			CHIP_FLASH_BANK_SIZE, FLASH_WP_EC);
-		data->all_protected = 1;
-	} else {
-		data->all_protected = 0;
-	}
-
-	/*
-	 * bit[0], eflash protect lock register which can only be write 1 and
-	 * only be cleared by power-on reset.
-	 */
-	IT83XX_GCTRL_EPLR |= IT83XX_GCTRL_EPLR_ENABLE;
-
-	return 0;
-}
-
 static const struct flash_parameters *
 flash_it8xxx2_get_parameters(const struct device *dev)
 {
@@ -535,46 +462,10 @@ flash_it8xxx2_get_parameters(const struct device *dev)
 	return &flash_it8xxx2_parameters;
 }
 
-static void flash_code_static_cache(const struct device *dev)
-{
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
-	struct flash_it8xxx2_dev_data *data = DEV_DATA(dev);
-	unsigned int key;
-
-	/* Make sure no interrupt while enable static cache */
-	key = irq_lock();
-
-	/* invalid static cache first */
-	IT83XX_GCTRL_RVILMCR0 &= ~ILMCR_ILM0_ENABLE;
-
-	flash_regs->SMFI_SCAR0H = IT8XXX2_SMFI_SCAR0H_ENABLE;
-
-	memcpy((void *)CHIP_RAMCODE_BASE, (const void *)FLASH_RAMCODE_START,
-		IT8XXX2_ILM_BLOCK_SIZE);
-
-	/* RISCV ILM 0 Enable */
-	IT83XX_GCTRL_RVILMCR0 |= ILMCR_ILM0_ENABLE;
-
-	/* Enable ILM */
-	flash_regs->SMFI_SCAR0L = FLASH_RAMCODE_START & GENMASK(7, 0);
-	flash_regs->SMFI_SCAR0M = (FLASH_RAMCODE_START >> 8) & GENMASK(7, 0);
-	flash_regs->SMFI_SCAR0H = (FLASH_RAMCODE_START >> 16) & GENMASK(2, 0);
-
-	if (FLASH_RAMCODE_START & FLASH_RAMCODE_START_BIT19) {
-		flash_regs->SMFI_SCAR0H |= IT8XXX2_SMFI_SC0A19;
-	} else {
-		flash_regs->SMFI_SCAR0H &= ~IT8XXX2_SMFI_SC0A19;
-	}
-
-	data->flash_static_cache_enabled = 0x01;
-
-	irq_unlock(key);
-}
-
 static int flash_it8xxx2_init(const struct device *dev)
 {
-	struct flash_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
-	struct flash_it8xxx2_dev_data *data = DEV_DATA(dev);
+	struct smfi_it8xxx2_regs *const flash_regs = FLASH_IT8XXX2_REG_BASE;
+	struct flash_it8xxx2_dev_data *data = dev->data;
 
 	/* By default, select internal flash for indirect fast read. */
 	flash_regs->SMFI_ECINDAR3 = EC_INDIRECT_READ_INTERNAL_FLASH;
@@ -589,17 +480,33 @@ static int flash_it8xxx2_init(const struct device *dev)
 	/* Initialize mutex for flash controller */
 	k_sem_init(&data->sem, 1, 1);
 
-	flash_code_static_cache(dev);
-
 	return 0;
 }
 
+#if defined(CONFIG_FLASH_PAGE_LAYOUT)
+static const struct flash_pages_layout dev_layout = {
+	.pages_count = DT_REG_SIZE(SOC_NV_FLASH_NODE) /
+			DT_PROP(SOC_NV_FLASH_NODE, erase_block_size),
+	.pages_size = DT_PROP(SOC_NV_FLASH_NODE, erase_block_size),
+};
+
+static void flash_it8xxx2_pages_layout(const struct device *dev,
+				       const struct flash_pages_layout **layout,
+				       size_t *layout_size)
+{
+	*layout = &dev_layout;
+	*layout_size = 1;
+}
+#endif /* CONFIG_FLASH_PAGE_LAYOUT */
+
 static const struct flash_driver_api flash_it8xxx2_api = {
-	.write_protection = flash_it8xxx2_write_protection,
 	.erase = flash_it8xxx2_erase,
 	.write = flash_it8xxx2_write,
 	.read = flash_it8xxx2_read,
 	.get_parameters = flash_it8xxx2_get_parameters,
+#if defined(CONFIG_FLASH_PAGE_LAYOUT)
+	.page_layout = flash_it8xxx2_pages_layout,
+#endif
 };
 
 static struct flash_it8xxx2_dev_data flash_it8xxx2_data;
@@ -607,5 +514,5 @@ static struct flash_it8xxx2_dev_data flash_it8xxx2_data;
 DEVICE_DT_INST_DEFINE(0, flash_it8xxx2_init, NULL,
 		      &flash_it8xxx2_data, NULL,
 		      PRE_KERNEL_1,
-		      CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,
+		      CONFIG_FLASH_INIT_PRIORITY,
 		      &flash_it8xxx2_api);

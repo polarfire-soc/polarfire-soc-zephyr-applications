@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <sys/util.h>
-#include <drivers/gpio.h>
-#include <modbus/modbus.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/modbus/modbus.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(mbc_sample, LOG_LEVEL_INF);
 
 static int client_iface;
@@ -20,12 +20,15 @@ const static struct modbus_iface_param client_param = {
 	.serial = {
 		.baud = 19200,
 		.parity = UART_CFG_PARITY_NONE,
+		.stop_bits_client = UART_CFG_STOP_BITS_2,
 	},
 };
 
+#define MODBUS_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_modbus_serial)
+
 static int init_modbus_client(void)
 {
-	const char iface_name[] = {DT_PROP(DT_INST(0, zephyr_modbus_serial), label)};
+	const char iface_name[] = {DEVICE_DT_NAME(MODBUS_NODE)};
 
 	client_iface = modbus_iface_get_by_name(iface_name);
 
@@ -50,7 +53,7 @@ void main(void)
 	err = modbus_write_holding_regs(client_iface, node, 0, holding_reg,
 					ARRAY_SIZE(holding_reg));
 	if (err != 0) {
-		LOG_ERR("FC16 failed");
+		LOG_ERR("FC16 failed with %d", err);
 		return;
 	}
 

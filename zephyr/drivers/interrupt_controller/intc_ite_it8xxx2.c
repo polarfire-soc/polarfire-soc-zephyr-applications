@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <kernel.h>
-#include <arch/cpu.h>
-#include <init.h>
-#include <sys/printk.h>
-#include <sw_isr_table.h>
+#include <zephyr/kernel.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(intc_it8xxx2, LOG_LEVEL_DBG);
+#include <zephyr/sys/printk.h>
+#include <zephyr/sw_isr_table.h>
 #include "intc_ite_it8xxx2.h"
 
 #define MAX_REGISR_IRQ_NUM		8
@@ -60,6 +62,7 @@ static uint8_t ier_setting[IT8XXX2_IER_COUNT];
 
 void ite_intc_save_and_disable_interrupts(void)
 {
+	volatile uint8_t _ier __unused;
 	/* Disable global interrupt for critical section */
 	unsigned int key = irq_lock();
 
@@ -68,6 +71,13 @@ void ite_intc_save_and_disable_interrupts(void)
 		ier_setting[i] = *reg_enable[i];
 		*reg_enable[i] = 0;
 	}
+	/*
+	 * This load operation will guarantee the above modification of
+	 * SOC's register can be seen by any following instructions.
+	 * Note: Barrier instruction can not synchronize chip register,
+	 * so we introduce workaround here.
+	 */
+	_ier = *reg_enable[IT8XXX2_IER_COUNT - 1];
 	irq_unlock(key);
 }
 
@@ -100,7 +110,7 @@ void ite_intc_isr_clear(unsigned int irq)
 	*isr = BIT(i);
 }
 
-void ite_intc_irq_enable(unsigned int irq)
+void __soc_ram_code ite_intc_irq_enable(unsigned int irq)
 {
 	uint32_t g, i;
 	volatile uint8_t *en;
@@ -118,10 +128,11 @@ void ite_intc_irq_enable(unsigned int irq)
 	irq_unlock(key);
 }
 
-void ite_intc_irq_disable(unsigned int irq)
+void __soc_ram_code ite_intc_irq_disable(unsigned int irq)
 {
 	uint32_t g, i;
 	volatile uint8_t *en;
+	volatile uint8_t _ier __unused;
 
 	if (irq > CONFIG_NUM_IRQS) {
 		return;
@@ -133,11 +144,15 @@ void ite_intc_irq_disable(unsigned int irq)
 	/* critical section due to run a bit-wise OR operation */
 	unsigned int key = irq_lock();
 	CLEAR_MASK(*en, BIT(i));
+	/*
+	 * This load operation will guarantee the above modification of
+	 * SOC's register can be seen by any following instructions.
+	 */
+	_ier = *en;
 	irq_unlock(key);
 }
 
-void ite_intc_irq_priority_set(unsigned int irq,
-		unsigned int prio, unsigned int flags)
+void ite_intc_irq_polarity_set(unsigned int irq, unsigned int flags)
 {
 	uint32_t g, i;
 	volatile uint8_t *tri;
@@ -161,7 +176,7 @@ void ite_intc_irq_priority_set(unsigned int irq,
 	}
 }
 
-int ite_intc_irq_is_enable(unsigned int irq)
+int __soc_ram_code ite_intc_irq_is_enable(unsigned int irq)
 {
 	uint32_t g, i;
 	volatile uint8_t *en;
@@ -175,12 +190,17 @@ int ite_intc_irq_is_enable(unsigned int irq)
 	return IS_MASK_SET(*en, BIT(i));
 }
 
-uint8_t ite_intc_get_irq_num(void)
+uint8_t __soc_ram_code ite_intc_get_irq_num(void)
 {
 	return intc_irq;
 }
 
-uint8_t get_irq(void *arg)
+bool __soc_ram_code ite_intc_no_irq(void)
+{
+	return (IVECT == IVECT_OFFSET_WITH_IRQ);
+}
+
+uint8_t __soc_ram_code get_irq(void *arg)
 {
 	ARG_UNUSED(arg);
 
@@ -196,15 +216,32 @@ uint8_t get_irq(void *arg)
 	} while (intc_irq != IVECT);
 	/* determine interrupt number */
 	intc_irq -= IVECT_OFFSET_WITH_IRQ;
+	/*
+	 * Look for pending interrupt if there's interrupt number 0 from
+	 * the AIVECT register.
+	 */
+	if (intc_irq == 0) {
+		uint8_t int_pending;
+
+		for (int i = (IT8XXX2_IER_COUNT - 1); i >= 0; i--) {
+			int_pending = (*reg_status[i] & *reg_enable[i]);
+			if (int_pending != 0) {
+				intc_irq = (MAX_REGISR_IRQ_NUM * i) +
+						find_msb_set(int_pending) - 1;
+				LOG_DBG("Pending interrupt found: %d",
+						intc_irq);
+				LOG_DBG("CPU mepc: 0x%lx", csr_read(mepc));
+				break;
+			}
+		}
+	}
 	/* clear interrupt status */
 	ite_intc_isr_clear(intc_irq);
-	/* Clear flag on each interrupt. */
-	wait_interrupt_fired = 0;
 	/* return interrupt number */
 	return intc_irq;
 }
 
-static int ite_intc_init(const struct device *dev)
+void ite_intc_init(void)
 {
 	/* Ensure interrupts of soc are disabled at default */
 	for (int i = 0; i < ARRAY_SIZE(reg_enable); i++)
@@ -212,8 +249,4 @@ static int ite_intc_init(const struct device *dev)
 
 	/* Enable M-mode external interrupt */
 	csr_set(mie, MIP_MEIP);
-
-	return 0;
 }
-
-SYS_INIT(ite_intc_init, PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);

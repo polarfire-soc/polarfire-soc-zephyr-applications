@@ -4,20 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <sys/printk.h>
-#include <drivers/gpio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/drivers/gpio.h>
 #include <soc.h>
-#include <drivers/kscan.h>
+#include <zephyr/drivers/kscan.h>
 
 #define LOG_LEVEL LOG_LEVEL_DBG
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(main);
 
-#define TOUCH_CONTROLLER_NODE DT_ALIAS(kscan0)
-
-const struct device *kscan_dev = DEVICE_DT_GET(TOUCH_CONTROLLER_NODE);
+const struct device *const kscan_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_keyboard_scan));
 
 static void k_callback(const struct device *dev, uint32_t row, uint32_t col,
 		       bool pressed)

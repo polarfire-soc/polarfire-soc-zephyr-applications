@@ -7,11 +7,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <arch/cpu.h>
-#include <drivers/gpio/gpio_mmio32.h>
-#include <init.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/drivers/gpio/gpio_mmio32.h>
+#include <zephyr/init.h>
 #include <soc.h>
-#include <linker/linker-defs.h>
+#include <zephyr/linker/linker-defs.h>
 
 
 /* Setup GPIO drivers for accessing FPGAIO registers */
@@ -37,7 +37,7 @@ FPGAIO_INIT(2);
 /* The base address that the application image will start at on the secondary
  * (non-TrustZone) Cortex-M33 mcu.
  */
-#define CPU1_FLASH_ADDRESS      (0x100000)
+#define CPU1_FLASH_ADDRESS      (0x38B000)
 
 /* The memory map offset for the application image, which is used
  * to determine the location of the reset vector at startup.
@@ -45,7 +45,7 @@ FPGAIO_INIT(2);
 #define CPU1_FLASH_OFFSET       (0x10000000)
 
 /**
- * @brief Wake up CPU 1 from another CPU, this is plaform specific.
+ * @brief Wake up CPU 1 from another CPU, this is platform specific.
  */
 void wakeup_cpu1(void)
 {
@@ -60,7 +60,7 @@ void wakeup_cpu1(void)
 }
 
 /**
- * @brief Get the current CPU ID, this is plaform specific.
+ * @brief Get the current CPU ID, this is platform specific.
  *
  * @return Current CPU ID
  */

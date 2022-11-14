@@ -11,6 +11,7 @@ zephyr_library_sources_ifdef(CONFIG_I2C_CC32XX		i2c_cc32xx.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_ESP32		i2c_esp32.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_GPIO		i2c_gpio.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_ITE_IT8XXX2		i2c_ite_it8xxx2.c)
+zephyr_library_sources_ifdef(CONFIG_I2C_ITE_ENHANCE		i2c_ite_enhance.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_IMX		i2c_imx.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_LPC11U6X        i2c_lpc11u6x.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_XEC		i2c_mchp_xec.c)
@@ -34,8 +35,10 @@ zephyr_library_sources_ifdef(CONFIG_I2C_NPCX		i2c_npcx_controller.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_NPCX		i2c_npcx_port.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_DW		i2c_dw.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_RCAR		i2c_rcar.c)
-zephyr_library_sources_ifdef(CONFIG_I2C_TCA9546A	i2c_tca9546a.c)
+zephyr_library_sources_ifdef(CONFIG_I2C_TCA954X		i2c_tca954x.c)
 zephyr_library_sources_ifdef(CONFIG_I2C_XEC_V2		i2c_mchp_xec_v2.c)
+zephyr_library_sources_ifdef(CONFIG_I2C_GD32		i2c_gd32.c)
+zephyr_library_sources_ifdef(CONFIG_I2C_ANDES_ATCIIC100		i2c_andes_atciic100.c)
 
 zephyr_library_sources_ifdef(CONFIG_I2C_STM32_V1
 	i2c_ll_stm32_v1.c
@@ -50,4 +53,4 @@ zephyr_library_sources_ifdef(CONFIG_I2C_TEST		i2c_test.c)
 
 zephyr_library_sources_ifdef(CONFIG_USERSPACE		i2c_handlers.c)
 
-add_subdirectory_ifdef(CONFIG_I2C_SLAVE			slave)
+add_subdirectory_ifdef(CONFIG_I2C_TARGET target)

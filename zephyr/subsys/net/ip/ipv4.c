@@ -8,15 +8,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_ipv4, CONFIG_NET_IPV4_LOG_LEVEL);
 
 #include <errno.h>
-#include <net/net_core.h>
-#include <net/net_pkt.h>
-#include <net/net_stats.h>
-#include <net/net_context.h>
-#include <net/virtual.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/net/net_pkt.h>
+#include <zephyr/net/net_stats.h>
+#include <zephyr/net/net_context.h>
+#include <zephyr/net/virtual.h>
 #include "net_private.h"
 #include "connection.h"
 #include "net_stats.h"
@@ -24,6 +24,8 @@ LOG_MODULE_REGISTER(net_ipv4, CONFIG_NET_IPV4_LOG_LEVEL);
 #include "udp_internal.h"
 #include "tcp_internal.h"
 #include "ipv4.h"
+
+BUILD_ASSERT(sizeof(struct in_addr) == NET_IPV4_ADDR_SIZE);
 
 /* Timeout for various buffer allocations in this file. */
 #define NET_BUF_TIMEOUT K_MSEC(50)
@@ -61,8 +63,8 @@ int net_ipv4_create_full(struct net_pkt *pkt,
 	ipv4_hdr->proto     = 0U;
 	ipv4_hdr->chksum    = 0U;
 
-	net_ipaddr_copy(&ipv4_hdr->dst, dst);
-	net_ipaddr_copy(&ipv4_hdr->src, src);
+	net_ipv4_addr_copy_raw(ipv4_hdr->dst, (uint8_t *)dst);
+	net_ipv4_addr_copy_raw(ipv4_hdr->src, (uint8_t *)src);
 
 	net_pkt_set_ip_hdr_len(pkt, sizeof(struct net_ipv4_hdr));
 
@@ -73,7 +75,14 @@ int net_ipv4_create(struct net_pkt *pkt,
 		    const struct in_addr *src,
 		    const struct in_addr *dst)
 {
-	return net_ipv4_create_full(pkt, src, dst, 0U, 0U, 0U, 0U,
+	uint8_t tos = 0;
+
+	if (IS_ENABLED(CONFIG_NET_IP_DSCP_ECN)) {
+		net_ipv4_set_dscp(&tos, net_pkt_ip_dscp(pkt));
+		net_ipv4_set_ecn(&tos, net_pkt_ip_ecn(pkt));
+	}
+
+	return net_ipv4_create_full(pkt, src, dst, tos, 0U, 0U, 0U,
 				    net_pkt_ipv4_ttl(pkt));
 }
 
@@ -246,6 +255,11 @@ enum net_verdict net_ipv4_input(struct net_pkt *pkt)
 
 	net_pkt_set_ip_hdr_len(pkt, sizeof(struct net_ipv4_hdr));
 
+	if (IS_ENABLED(CONFIG_NET_IP_DSCP_ECN)) {
+		net_pkt_set_ip_dscp(pkt, net_ipv4_get_dscp(hdr->tos));
+		net_pkt_set_ip_ecn(pkt, net_ipv4_get_ecn(hdr->tos));
+	}
+
 	opts_len = hdr_len - sizeof(struct net_ipv4_hdr);
 	if (opts_len > NET_IPV4_HDR_OPTNS_MAX_LEN) {
 		return -EINVAL;
@@ -266,17 +280,18 @@ enum net_verdict net_ipv4_input(struct net_pkt *pkt)
 		net_pkt_update_length(pkt, pkt_len);
 	}
 
-	if (net_ipv4_is_addr_mcast(&hdr->src)) {
+	if (net_ipv4_is_addr_mcast((struct in_addr *)hdr->src)) {
 		NET_DBG("DROP: src addr is %s", "mcast");
 		goto drop;
 	}
 
-	if (net_ipv4_is_addr_bcast(net_pkt_iface(pkt), &hdr->src)) {
+	if (net_ipv4_is_addr_bcast(net_pkt_iface(pkt), (struct in_addr *)hdr->src)) {
 		NET_DBG("DROP: src addr is %s", "bcast");
 		goto drop;
 	}
 
-	if (net_ipv4_is_addr_unspecified(&hdr->src)) {
+	if (net_ipv4_is_addr_unspecified((struct in_addr *)hdr->src) &&
+	    !net_ipv4_is_addr_bcast(net_pkt_iface(pkt), (struct in_addr *)hdr->dst)) {
 		NET_DBG("DROP: src addr is %s", "unspecified");
 		goto drop;
 	}
@@ -287,16 +302,16 @@ enum net_verdict net_ipv4_input(struct net_pkt *pkt)
 		goto drop;
 	}
 
-	if ((!net_ipv4_is_my_addr(&hdr->dst) &&
-	     !net_ipv4_is_addr_mcast(&hdr->dst) &&
+	if ((!net_ipv4_is_my_addr((struct in_addr *)hdr->dst) &&
+	     !net_ipv4_is_addr_mcast((struct in_addr *)hdr->dst) &&
 	     !(hdr->proto == IPPROTO_UDP &&
-	       (net_ipv4_addr_cmp(&hdr->dst, net_ipv4_broadcast_address()) ||
+	       (net_ipv4_addr_cmp((struct in_addr *)hdr->dst, net_ipv4_broadcast_address()) ||
 		/* RFC 1122 ch. 3.3.6 The 0.0.0.0 is non-standard bcast addr */
 		(IS_ENABLED(CONFIG_NET_IPV4_ACCEPT_ZERO_BROADCAST) &&
-		 net_ipv4_addr_cmp(&hdr->dst,
+		 net_ipv4_addr_cmp((struct in_addr *)hdr->dst,
 				   net_ipv4_unspecified_address()))))) ||
 	    (hdr->proto == IPPROTO_TCP &&
-	     net_ipv4_is_addr_bcast(net_pkt_iface(pkt), &hdr->dst))) {
+	     net_ipv4_is_addr_bcast(net_pkt_iface(pkt), (struct in_addr *)hdr->dst))) {
 		NET_DBG("DROP: not for me");
 		goto drop;
 	}
@@ -315,9 +330,17 @@ enum net_verdict net_ipv4_input(struct net_pkt *pkt)
 
 	net_pkt_set_family(pkt, PF_INET);
 
+	if (IS_ENABLED(CONFIG_NET_IPV4_FRAGMENT)) {
+		/* Check if this is a fragmented packet, and if so, handle reassembly */
+		if ((ntohs(*((uint16_t *)&hdr->offset[0])) &
+		     (NET_IPV4_FRAGH_OFFSET_MASK | NET_IPV4_MORE_FRAG_MASK)) != 0) {
+			return net_ipv4_handle_fragment_hdr(pkt, hdr);
+		}
+	}
+
 	NET_DBG("IPv4 packet received from %s to %s",
-		log_strdup(net_sprint_ipv4_addr(&hdr->src)),
-		log_strdup(net_sprint_ipv4_addr(&hdr->dst)));
+		net_sprint_ipv4_addr(&hdr->src),
+		net_sprint_ipv4_addr(&hdr->dst));
 
 	switch (hdr->proto) {
 	case IPPROTO_ICMP:
@@ -353,7 +376,7 @@ enum net_verdict net_ipv4_input(struct net_pkt *pkt)
 		struct net_addr remote_addr;
 
 		remote_addr.family = AF_INET;
-		net_ipaddr_copy(&remote_addr.in_addr, &hdr->src);
+		net_ipv4_addr_copy_raw((uint8_t *)&remote_addr.in_addr, hdr->src);
 
 		/* Get rid of the old IP header */
 		net_pkt_cursor_restore(pkt, &hdr_start);
@@ -376,7 +399,15 @@ enum net_verdict net_ipv4_input(struct net_pkt *pkt)
 	if (verdict != NET_DROP) {
 		return verdict;
 	}
+
 drop:
 	net_stats_update_ipv4_drop(net_pkt_iface(pkt));
 	return NET_DROP;
+}
+
+void net_ipv4_init(void)
+{
+	if (IS_ENABLED(CONFIG_NET_IPV4_FRAGMENT)) {
+		net_ipv4_setup_fragment_buffers();
+	}
 }

@@ -5,17 +5,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <errno.h>
-#include <sys/atomic.h>
-#include <sys/util.h>
-#include <sys/byteorder.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/byteorder.h>
 
-#include <net/buf.h>
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/mesh.h>
-#include <bluetooth/uuid.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/mesh.h>
+#include <zephyr/bluetooth/uuid.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_PROV)
 #define LOG_MODULE_NAME bt_mesh_prov
@@ -302,7 +302,7 @@ int bt_mesh_input_number(uint32_t num)
 
 int bt_mesh_input_string(const char *str)
 {
-	BT_DBG("%s", log_strdup(str));
+	BT_DBG("%s", str);
 
 	if (strlen(str) > PROV_IO_OOB_SIZE_MAX ||
 			strlen(str) > bt_mesh_prov_link.oob_size) {
@@ -431,11 +431,11 @@ void bt_mesh_prov_complete(uint16_t net_idx, uint16_t addr)
 void bt_mesh_prov_reset(void)
 {
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_ADV)) {
-		pb_adv_reset();
+		bt_mesh_pb_adv_reset();
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_GATT)) {
-		pb_gatt_reset();
+		bt_mesh_pb_gatt_reset();
 	}
 
 	bt_mesh_prov_reset_state(NULL);
@@ -455,11 +455,11 @@ int bt_mesh_prov_init(const struct bt_mesh_prov *prov_info)
 	bt_mesh_prov = prov_info;
 
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_ADV)) {
-		pb_adv_init();
+		bt_mesh_pb_adv_init();
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_PB_GATT)) {
-		pb_gatt_init();
+		bt_mesh_pb_gatt_init();
 	}
 
 	return bt_mesh_prov_reset_state(NULL);

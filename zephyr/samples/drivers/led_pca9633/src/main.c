@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <device.h>
+#include <zephyr/device.h>
 #include <errno.h>
-#include <drivers/led.h>
-#include <sys/util.h>
-#include <zephyr.h>
+#include <zephyr/drivers/led.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/kernel.h>
 
 #define LOG_LEVEL CONFIG_LOG_DEFAULT_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main);
 
 #define NUM_LEDS 4
@@ -24,7 +24,7 @@ LOG_MODULE_REGISTER(main);
 
 void main(void)
 {
-	const struct device *led_dev = DEVICE_DT_GET_ANY(nxp_pca9633);
+	const struct device *const led_dev = DEVICE_DT_GET_ANY(nxp_pca9633);
 	int i, ret;
 
 	if (!led_dev) {

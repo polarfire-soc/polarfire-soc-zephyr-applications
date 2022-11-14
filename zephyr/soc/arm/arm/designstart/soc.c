@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <device.h>
+#include <zephyr/device.h>
+#include <zephyr/arch/arm/aarch32/nmi.h>
 
 static int arm_designstart_init(const struct device *arg)
 {

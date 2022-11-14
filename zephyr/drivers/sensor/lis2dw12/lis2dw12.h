@@ -11,19 +11,19 @@
 #ifndef ZEPHYR_DRIVERS_SENSOR_LIS2DW12_LIS2DW12_H_
 #define ZEPHYR_DRIVERS_SENSOR_LIS2DW12_LIS2DW12_H_
 
-#include <drivers/spi.h>
-#include <drivers/gpio.h>
-#include <sys/util.h>
-#include <drivers/sensor.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/drivers/sensor.h>
 #include <stmemsc.h>
 #include "lis2dw12_reg.h"
 
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
-#include <drivers/spi.h>
+#include <zephyr/drivers/spi.h>
 #endif /* DT_ANY_INST_ON_BUS_STATUS_OKAY(spi) */
 
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c)
-#include <drivers/i2c.h>
+#include <zephyr/drivers/i2c.h>
 #endif /* DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c) */
 
 /* Return ODR reg value based on data rate set */
@@ -31,6 +31,14 @@
 	((_odr <= 1) ? LIS2DW12_XL_ODR_1Hz6_LP_ONLY : \
 	 (_odr <= 12) ? LIS2DW12_XL_ODR_12Hz5 : \
 	 ((31 - __builtin_clz(_odr / 25))) + 3)
+
+/* Return data rate in Hz for given register value */
+#define LIS2DW12_REG_TO_ODR(_reg) \
+	((_reg == 0) ? 0 : \
+	(_reg == 1) ? 1 : \
+	(_reg == 2) ? 12 : \
+	(_reg > 9) ? 1600 : \
+	(1 << (_reg - 3)) * 25)
 
 /* FS reg value from Full Scale */
 #define LIS2DW12_FS_TO_REG(_fs)	(30 - __builtin_clz(_fs))
@@ -60,14 +68,20 @@ struct lis2dw12_device_config {
 	stmdev_ctx_t ctx;
 	union {
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c)
-		const struct stmemsc_cfg_i2c i2c;
+		const struct i2c_dt_spec i2c;
 #endif
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
-		const struct stmemsc_cfg_spi spi;
+		const struct spi_dt_spec spi;
 #endif
 	} stmemsc_cfg;
 	lis2dw12_mode_t pm;
+	uint16_t odr;
 	uint8_t range;
+	uint8_t bw_filt;
+	bool low_noise;
+	bool hp_filter_path;
+	bool hp_ref_mode;
+	bool drdy_pulsed;
 #ifdef CONFIG_LIS2DW12_TRIGGER
 	struct gpio_dt_spec gpio_int;
 	uint8_t int_pin;
@@ -78,6 +92,10 @@ struct lis2dw12_device_config {
 	uint8_t tap_latency;
 	uint8_t tap_quiet;
 #endif /* CONFIG_LIS2DW12_TAP */
+#ifdef CONFIG_LIS2DW12_FREEFALL
+	uint8_t freefall_duration;
+	uint8_t freefall_threshold;
+#endif /* CONFIG_LIS2DW12_FREEFALL */
 #endif /* CONFIG_LIS2DW12_TRIGGER */
 };
 
@@ -87,6 +105,8 @@ struct lis2dw12_data {
 
 	 /* save sensitivity */
 	uint16_t gain;
+	 /* output data rate */
+	uint16_t odr;
 
 #ifdef CONFIG_LIS2DW12_TRIGGER
 	const struct device *dev;
@@ -97,6 +117,12 @@ struct lis2dw12_data {
 	sensor_trigger_handler_t tap_handler;
 	sensor_trigger_handler_t double_tap_handler;
 #endif /* CONFIG_LIS2DW12_TAP */
+#ifdef CONFIG_LIS2DW12_THRESHOLD
+	sensor_trigger_handler_t threshold_handler;
+#endif /* CONFIG_LIS2DW12_THRESHOLD */
+#ifdef CONFIG_LIS2DW12_FREEFALL
+	sensor_trigger_handler_t freefall_handler;
+#endif /* CONFIG_LIS2DW12_FREEFALL */
 #if defined(CONFIG_LIS2DW12_TRIGGER_OWN_THREAD)
 	K_KERNEL_STACK_MEMBER(thread_stack, CONFIG_LIS2DW12_THREAD_STACK_SIZE);
 	struct k_thread thread;

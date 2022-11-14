@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_coap, CONFIG_COAP_LOG_LEVEL);
 
 #include <stdlib.h>
@@ -12,17 +12,17 @@ LOG_MODULE_REGISTER(net_coap, CONFIG_COAP_LOG_LEVEL);
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <random/rand32.h>
-#include <sys/atomic.h>
-#include <sys/util.h>
+#include <zephyr/random/rand32.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/util.h>
 
 #include <zephyr/types.h>
-#include <sys/byteorder.h>
-#include <sys/math_extras.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/math_extras.h>
 
-#include <net/net_ip.h>
-#include <net/net_core.h>
-#include <net/coap.h>
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/net/coap.h>
 
 /* Values as per RFC 7252, section-3.1.
  *
@@ -577,12 +577,12 @@ int coap_packet_parse(struct coap_packet *cpkt, uint8_t *data, uint16_t len,
 	/* Token lengths 9-15 are reserved. */
 	tkl = cpkt->data[0] & 0x0f;
 	if (tkl > 8) {
-		return -EINVAL;
+		return -EBADMSG;
 	}
 
 	cpkt->hdr_len = BASIC_HEADER_SIZE + tkl;
 	if (cpkt->hdr_len > len) {
-		return -EINVAL;
+		return -EBADMSG;
 	}
 
 	if (cpkt->hdr_len == len) {
@@ -601,7 +601,7 @@ int coap_packet_parse(struct coap_packet *cpkt, uint8_t *data, uint16_t len,
 		ret = parse_option(cpkt->data, offset, &offset, cpkt->max_len,
 				   &delta, &opt_len, option);
 		if (ret < 0) {
-			return ret;
+			return -EILSEQ;
 		} else if (ret == 0) {
 			break;
 		}
@@ -705,6 +705,9 @@ uint8_t coap_header_get_code(const struct coap_packet *cpkt)
 	case COAP_METHOD_POST:
 	case COAP_METHOD_PUT:
 	case COAP_METHOD_DELETE:
+	case COAP_METHOD_FETCH:
+	case COAP_METHOD_PATCH:
+	case COAP_METHOD_IPATCH:
 
 	/* All the defined response codes */
 	case COAP_RESPONSE_CODE_OK:
@@ -722,9 +725,11 @@ uint8_t coap_header_get_code(const struct coap_packet *cpkt)
 	case COAP_RESPONSE_CODE_NOT_ALLOWED:
 	case COAP_RESPONSE_CODE_NOT_ACCEPTABLE:
 	case COAP_RESPONSE_CODE_INCOMPLETE:
+	case COAP_RESPONSE_CODE_CONFLICT:
 	case COAP_RESPONSE_CODE_PRECONDITION_FAILED:
 	case COAP_RESPONSE_CODE_REQUEST_TOO_LARGE:
 	case COAP_RESPONSE_CODE_UNSUPPORTED_CONTENT_FORMAT:
+	case COAP_RESPONSE_CODE_UNPROCESSABLE_ENTITY:
 	case COAP_RESPONSE_CODE_INTERNAL_ERROR:
 	case COAP_RESPONSE_CODE_NOT_IMPLEMENTED:
 	case COAP_RESPONSE_CODE_BAD_GATEWAY:
@@ -814,20 +819,33 @@ static bool uri_path_eq(const struct coap_packet *cpkt,
 	return true;
 }
 
-static coap_method_t method_from_code(const struct coap_resource *resource,
-				      uint8_t code)
+static int method_from_code(const struct coap_resource *resource,
+			    uint8_t code, coap_method_t *method)
 {
 	switch (code) {
 	case COAP_METHOD_GET:
-		return resource->get;
+		*method = resource->get;
+		return 0;
 	case COAP_METHOD_POST:
-		return resource->post;
+		*method = resource->post;
+		return 0;
 	case COAP_METHOD_PUT:
-		return resource->put;
+		*method = resource->put;
+		return 0;
 	case COAP_METHOD_DELETE:
-		return resource->del;
+		*method = resource->del;
+		return 0;
+	case COAP_METHOD_FETCH:
+		*method = resource->fetch;
+		return 0;
+	case COAP_METHOD_PATCH:
+		*method = resource->patch;
+		return 0;
+	case COAP_METHOD_IPATCH:
+		*method = resource->ipatch;
+		return 0;
 	default:
-		return NULL;
+		return -EINVAL;
 	}
 }
 
@@ -860,7 +878,10 @@ int coap_handle_request(struct coap_packet *cpkt,
 		}
 
 		code = coap_header_get_code(cpkt);
-		method = method_from_code(resource, code);
+		if (method_from_code(resource, code, &method) < 0) {
+			return -ENOTSUP;
+		}
+
 		if (!method) {
 			return -EPERM;
 		}
@@ -1008,7 +1029,10 @@ static int update_control_block1(struct coap_block_context *ctx,
 	}
 
 	ctx->block_size = GET_BLOCK_SIZE(block);
-	ctx->total_size = size;
+
+	if (size >= 0) {
+		ctx->total_size = size;
+	}
 
 	return 0;
 }
@@ -1046,16 +1070,13 @@ int coap_update_from_block(const struct coap_packet *cpkt,
 	size1 = coap_get_option_int(cpkt, COAP_OPTION_SIZE1);
 	size2 = coap_get_option_int(cpkt, COAP_OPTION_SIZE2);
 
-	size1 = size1 == -ENOENT ? 0 : size1;
-	size2 = size2 == -ENOENT ? 0 : size2;
-
 	if (is_request(cpkt)) {
 		r = update_control_block2(ctx, block2, size2);
 		if (r) {
 			return r;
 		}
 
-		return update_descriptive_block(ctx, block1, size1);
+		return update_descriptive_block(ctx, block1, size1 == -ENOENT ? 0 : size1);
 	}
 
 	r = update_control_block1(ctx, block1, size1);
@@ -1063,27 +1084,51 @@ int coap_update_from_block(const struct coap_packet *cpkt,
 		return r;
 	}
 
-	return update_descriptive_block(ctx, block2, size2);
+	return update_descriptive_block(ctx, block2, size2 == -ENOENT ? 0 : size2);
 }
 
-size_t coap_next_block(const struct coap_packet *cpkt,
-		       struct coap_block_context *ctx)
+int coap_next_block_for_option(const struct coap_packet *cpkt,
+			       struct coap_block_context *ctx,
+			       enum coap_option_num option)
 {
 	int block;
+	uint16_t block_len;
 
-	if (is_request(cpkt)) {
-		block = coap_get_option_int(cpkt, COAP_OPTION_BLOCK1);
-	} else {
-		block = coap_get_option_int(cpkt, COAP_OPTION_BLOCK2);
+	if (option != COAP_OPTION_BLOCK1 && option != COAP_OPTION_BLOCK2) {
+		return -EINVAL;
 	}
+
+	block = coap_get_option_int(cpkt, option);
+
+	if (block < 0) {
+		return block;
+	}
+
+	coap_packet_get_payload(cpkt, &block_len);
+	/* Check that the package does not exceed the expected size ONLY */
+	if ((ctx->total_size > 0) &&
+	    (ctx->total_size < (ctx->current + block_len))) {
+		return -EMSGSIZE;
+	}
+	ctx->current += block_len;
 
 	if (!GET_MORE(block)) {
 		return 0;
 	}
 
-	ctx->current += coap_block_size_to_bytes(ctx->block_size);
+	return (int)ctx->current;
+}
 
-	return ctx->current;
+size_t coap_next_block(const struct coap_packet *cpkt,
+		       struct coap_block_context *ctx)
+{
+	enum coap_option_num option;
+	int ret;
+
+	option = is_request(cpkt) ? COAP_OPTION_BLOCK1 : COAP_OPTION_BLOCK2;
+	ret = coap_next_block_for_option(cpkt, ctx, option);
+
+	return MAX(ret, 0);
 }
 
 int coap_pending_init(struct coap_pending *pending,
@@ -1112,7 +1157,7 @@ struct coap_pending *coap_pending_next_unused(
 	size_t i;
 
 	for (i = 0, p = pendings; i < len; i++, p++) {
-		if (p->timeout == 0) {
+		if (p->data == 0) {
 			return p;
 		}
 	}
@@ -1216,7 +1261,7 @@ static uint32_t init_ack_timeout(void)
 {
 #if defined(CONFIG_COAP_RANDOMIZE_ACK_TIMEOUT)
 	const uint32_t max_ack = CONFIG_COAP_INIT_ACK_TIMEOUT_MS *
-				 COAP_DEFAULT_ACK_RANDOM_FACTOR;
+				 CONFIG_COAP_ACK_RANDOM_PERCENT / 100;
 	const uint32_t min_ack = CONFIG_COAP_INIT_ACK_TIMEOUT_MS;
 
 	/* Randomly generated initial ACK timeout
@@ -1462,8 +1507,6 @@ struct coap_observer *coap_find_observer_by_addr(
  *
  * @note This function is not exposed in a public header, as it's for internal
  * use and should therefore not be exposed to applications.
- *
- * @return N/A
  */
 void net_coap_init(void)
 {

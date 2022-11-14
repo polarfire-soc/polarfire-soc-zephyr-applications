@@ -11,11 +11,11 @@
  * Reset handler that prepares the system for running C code.
  */
 
-#include <toolchain.h>
-#include <linker/sections.h>
-#include <arch/cpu.h>
+#include <zephyr/toolchain.h>
+#include <zephyr/linker/sections.h>
+#include <zephyr/arch/cpu.h>
 #include <swap_macros.h>
-#include <arch/arc/asm-compat/assembler.h>
+#include <zephyr/arch/arc/asm-compat/assembler.h>
 
 GDATA(z_interrupt_stacks)
 GDATA(z_main_stack)
@@ -31,7 +31,6 @@ GTEXT(__reset)
 GTEXT(__start)
 
 /**
- *
  * @brief Reset vector
  *
  * Ran when the system comes out of reset. The processor is at supervisor level.
@@ -40,8 +39,6 @@ GTEXT(__start)
  *
  * When these steps are completed, jump to _PrepC(), which will finish setting
  * up the system for running C code.
- *
- * @return N/A
  */
 
 SECTION_SUBSEC_FUNC(TEXT,_reset_and__start,__reset)
@@ -145,7 +142,7 @@ done_mpu_regions_reset:
 #endif
 #endif
 
-#if defined(CONFIG_SMP) || CONFIG_MP_NUM_CPUS  > 1
+#if defined(CONFIG_SMP) || CONFIG_MP_MAX_NUM_CPUS  > 1
 	_get_cpu_id r0
 	breq r0, 0, _master_core_startup
 
@@ -153,7 +150,7 @@ done_mpu_regions_reset:
  * Non-masters wait for master core (core 0) to boot enough
  */
 _slave_core_wait:
-#if CONFIG_MP_NUM_CPUS == 1
+#if CONFIG_MP_MAX_NUM_CPUS == 1
 	kflag	1
 #endif
 	ld r1, [arc_cpu_wake_flag]

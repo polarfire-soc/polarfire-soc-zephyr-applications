@@ -6,15 +6,16 @@
 
 #define DT_DRV_COMPAT sensirion_sgp40
 
-#include <device.h>
-#include <drivers/i2c.h>
-#include <kernel.h>
-#include <drivers/sensor.h>
-#include <logging/log.h>
-#include <sys/byteorder.h>
-#include <sys/crc.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/crc.h>
 
-#include <drivers/sensor/sgp40.h>
+#include <zephyr/drivers/sensor/sgp40.h>
 #include "sgp40.h"
 
 LOG_MODULE_REGISTER(SGP40, CONFIG_SENSOR_LOG_LEVEL);
@@ -186,7 +187,8 @@ static int sgp40_channel_get(const struct device *dev,
 
 
 #ifdef CONFIG_PM_DEVICE
-static int sgp40_pm_ctrl(const struct device *dev, enum pm_device_action action)
+static int sgp40_pm_action(const struct device *dev,
+			   enum pm_device_action action)
 {
 	uint16_t cmd;
 
@@ -223,7 +225,7 @@ static int sgp40_init(const struct device *dev)
 			LOG_ERR("Selftest failed!");
 			return rc;
 		}
-		LOG_DBG("Selftest succeded!");
+		LOG_DBG("Selftest succeeded!");
 	}
 
 	comp_data.val1 = SGP40_COMP_DEFAULT_T;
@@ -254,9 +256,11 @@ static const struct sensor_driver_api sgp40_api = {
 		.selftest = DT_INST_PROP(n, enable_selftest),	\
 	};							\
 								\
-	DEVICE_DT_INST_DEFINE(n,				\
+	PM_DEVICE_DT_INST_DEFINE(n, sgp40_pm_action);		\
+								\
+	SENSOR_DEVICE_DT_INST_DEFINE(n,				\
 			      sgp40_init,			\
-			      sgp40_pm_ctrl,\
+			      PM_DEVICE_DT_INST_GET(n),	\
 			      &sgp40_data_##n,			\
 			      &sgp40_config_##n,		\
 			      POST_KERNEL,			\

@@ -7,6 +7,5 @@ config SOC_SERIES_RISCV64_MIV
 	bool "Microchip RV64 implementation"
 	select RISCV
 	select SOC_FAMILY_RISCV_PRIVILEGE
-	select HAS_MFPS_HAL
 	help
 	  Enable support for Microchip RISCV 64bit

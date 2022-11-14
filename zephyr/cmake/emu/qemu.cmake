@@ -2,6 +2,12 @@
 
 if("${ARCH}" STREQUAL "x86")
   set_ifndef(QEMU_binary_suffix i386)
+elseif("${ARCH}" STREQUAL "mips")
+  if(CONFIG_BIG_ENDIAN)
+    set_ifndef(QEMU_binary_suffix mips)
+  else()
+    set_ifndef(QEMU_binary_suffix mipsel)
+  endif()
 elseif(DEFINED QEMU_ARCH)
   set_ifndef(QEMU_binary_suffix ${QEMU_ARCH})
 else()
@@ -37,8 +43,8 @@ if(CONFIG_QEMU_UEFI_BOOT)
 endif()
 
 set(qemu_targets
-  run
-  debugserver
+  run_qemu
+  debugserver_qemu
   )
 
 set(QEMU_FLAGS -pidfile)
@@ -48,6 +54,8 @@ else()
   list(APPEND QEMU_FLAGS qemu${QEMU_INSTANCE}.pid)
 endif()
 
+# If running with sysbuild, we need to ensure this variable is populated
+zephyr_get(QEMU_PIPE)
 # Set up chardev for console.
 if(QEMU_PTY)
   # Redirect console to a pseudo-tty, used for running automated tests.
@@ -64,7 +72,7 @@ endif()
 list(APPEND QEMU_FLAGS -serial chardev:con)
 
 # Connect semihosting console to the console chardev if configured.
-if(CONFIG_SEMIHOST_CONSOLE)
+if(CONFIG_SEMIHOST)
   list(APPEND QEMU_FLAGS
     -semihosting-config enable=on,target=auto,chardev=con
     )
@@ -74,9 +82,15 @@ endif()
 list(APPEND QEMU_FLAGS -mon chardev=con,mode=readline)
 
 if(CONFIG_QEMU_ICOUNT)
-  list(APPEND QEMU_FLAGS
+  if(CONFIG_QEMU_ICOUNT_SLEEP)
+    list(APPEND QEMU_FLAGS
+	  -icount shift=${CONFIG_QEMU_ICOUNT_SHIFT},align=off,sleep=on
+	  -rtc clock=vm)
+  else()
+    list(APPEND QEMU_FLAGS
 	  -icount shift=${CONFIG_QEMU_ICOUNT_SHIFT},align=off,sleep=off
 	  -rtc clock=vm)
+  endif()
 endif()
 
 # Add a BT serial device when building for bluetooth, unless the
@@ -255,6 +269,22 @@ elseif(QEMU_NET_STACK)
   endif()
 endif(QEMU_PIPE_STACK)
 
+if(CONFIG_CAN AND NOT (CONFIG_NIOS2 OR CONFIG_SOC_LEON3))
+  # Add CAN bus 0
+  list(APPEND QEMU_FLAGS -object can-bus,id=canbus0)
+
+  if(NOT "${CONFIG_CAN_QEMU_IFACE_NAME}" STREQUAL "")
+    # Connect CAN bus 0 to host SocketCAN interface
+    list(APPEND QEMU_FLAGS
+      -object can-host-socketcan,id=canhost0,if=${CONFIG_CAN_QEMU_IFACE_NAME},canbus=canbus0)
+  endif()
+
+  if(CONFIG_CAN_KVASER_PCI)
+    # Emulate a single-channel Kvaser PCIcan card connected to CAN bus 0
+    list(APPEND QEMU_FLAGS -device kvaser_pci,canbus=canbus0)
+  endif()
+endif()
+
 if(CONFIG_X86_64 AND NOT CONFIG_QEMU_UEFI_BOOT)
   # QEMU doesn't like 64-bit ELF files. Since we don't use any >4GB
   # addresses, converting it to 32-bit is safe enough for emulation.
@@ -325,8 +355,8 @@ endif()
 # Don't just test CONFIG_SMP, there is at least one test of the lower
 # level multiprocessor API that wants an auxiliary CPU but doesn't
 # want SMP using it.
-if(NOT CONFIG_MP_NUM_CPUS MATCHES "1")
-  list(APPEND QEMU_SMP_FLAGS -smp cpus=${CONFIG_MP_NUM_CPUS})
+if(NOT CONFIG_MP_MAX_NUM_CPUS MATCHES "1")
+  list(APPEND QEMU_SMP_FLAGS -smp cpus=${CONFIG_MP_MAX_NUM_CPUS})
 endif()
 
 # Use flags passed in from the environment
@@ -334,7 +364,7 @@ set(env_qemu $ENV{QEMU_EXTRA_FLAGS})
 separate_arguments(env_qemu)
 list(APPEND QEMU_EXTRA_FLAGS ${env_qemu})
 
-list(APPEND MORE_FLAGS_FOR_debugserver -s -S)
+list(APPEND MORE_FLAGS_FOR_debugserver_qemu -s -S)
 
 # Architectures can define QEMU_KERNEL_FILE to use a specific output
 # file to pass to qemu (and a "qemu_kernel_target" target to generate

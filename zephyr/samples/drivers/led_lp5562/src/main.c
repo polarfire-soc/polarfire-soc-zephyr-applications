@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <device.h>
+#include <zephyr/device.h>
 #include <errno.h>
-#include <drivers/led.h>
-#include <sys/util.h>
-#include <zephyr.h>
+#include <zephyr/drivers/led.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/kernel.h>
 
 #define LOG_LEVEL 4
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main);
 
 #define NUM_LEDS 4
@@ -164,7 +164,7 @@ static int turn_off_all_leds(const struct device *dev)
 
 void main(void)
 {
-	const struct device *dev = DEVICE_DT_GET_ANY(ti_lp5562);
+	const struct device *const dev = DEVICE_DT_GET_ANY(ti_lp5562);
 	int i, ret;
 
 	if (!dev) {

@@ -157,7 +157,8 @@ uint32_t ticker_next_slot_get(uint8_t instance_index, uint8_t user_id,
 			      ticker_op_func fp_op_func, void *op_context);
 uint32_t ticker_next_slot_get_ext(uint8_t instance_index, uint8_t user_id,
 				  uint8_t *ticker_id, uint32_t *ticks_current,
-				  uint32_t *ticks_to_expire, uint16_t *lazy,
+				  uint32_t *ticks_to_expire,
+				  uint32_t *remainder, uint16_t *lazy,
 				  ticker_op_match_func fp_op_match_func,
 				  void *match_op_context,
 				  ticker_op_func fp_op_func, void *op_context);
@@ -178,7 +179,7 @@ struct ticker_ext {
 				    * reservation may be re-scheduled
 				    * to avoid collision
 				    */
-	int32_t ticks_drift;	   /* Applied drift since last expiry */
+	uint32_t ticks_drift;      /* Actual drift since last expiry */
 	uint8_t reschedule_state;  /* State of re-scheduling of the
 				    * node. See defines
 				    * TICKER_RESCHEDULE_STATE_XXX

@@ -6,11 +6,12 @@
 
 #define DT_DRV_COMPAT nxp_kinetis_pit
 
-#include <drivers/counter.h>
+#include <zephyr/drivers/counter.h>
+#include <zephyr/irq.h>
 #include <fsl_pit.h>
 
 #define LOG_MODULE_NAME counter_pit
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_COUNTER_LOG_LEVEL);
 
 struct mcux_pit_config {
@@ -143,13 +144,13 @@ static int mcux_pit_set_alarm(const struct device *dev, uint8_t chan_id,
 
 	uint32_t ticks = alarm_cfg->ticks;
 
-	if (chan_id != DT_PROP(DT_DRV_INST(0), pit_channel)) {
+	if (chan_id != DT_INST_PROP(0, pit_channel)) {
 		LOG_ERR("Invalid channel id");
 		return -EINVAL;
 	}
 
 	if (ticks > mcux_pit_get_top_value(dev)) {
-		LOG_ERR("Invalid tciks");
+		LOG_ERR("Invalid ticks");
 		return -EINVAL;
 	}
 
@@ -167,7 +168,7 @@ static int mcux_pit_cancel_alarm(const struct device *dev, uint8_t chan_id)
 	const struct mcux_pit_config *config = dev->config;
 	struct mcux_pit_data *data = dev->data;
 
-	if (chan_id != DT_PROP(DT_DRV_INST(0), pit_channel)) {
+	if (chan_id != DT_INST_PROP(0, pit_channel)) {
 		LOG_ERR("Invalid channel id");
 		return -EINVAL;
 	}
@@ -193,7 +194,7 @@ static int mcux_pit_init(const struct device *dev)
 	config->irq_config_func(dev);
 
 	PIT_SetTimerPeriod(config->base, config->pit_channel,
-			   USEC_TO_COUNT(DT_PROP(DT_DRV_INST(0), pit_period),
+			   USEC_TO_COUNT(DT_INST_PROP(0, pit_period),
 					 CLOCK_GetFreq(kCLOCK_BusClk)));
 
 	return 0;
@@ -225,16 +226,16 @@ static const struct mcux_pit_config mcux_pit_config_0 = {
 	.info = {
 		.max_top_value = UINT32_MAX,
 		.channels = 1,
-		.freq = DT_PROP(DT_DRV_INST(0), clock_frequency),
+		.freq = DT_INST_PROP(0, clock_frequency),
 	},
 	.base = (PIT_Type *)DT_INST_REG_ADDR(0),
-	.pit_channel = DT_PROP(DT_DRV_INST(0), pit_channel),
+	.pit_channel = DT_INST_PROP(0, pit_channel),
 	.irq_config_func = mcux_pit_irq_config_0,
 };
 
 DEVICE_DT_INST_DEFINE(0, &mcux_pit_init, NULL,
 		    &mcux_pit_data_0, &mcux_pit_config_0, POST_KERNEL,
-		    CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &mcux_pit_driver_api);
+		    CONFIG_COUNTER_INIT_PRIORITY, &mcux_pit_driver_api);
 
 static void mcux_pit_irq_config_0(const struct device *dev)
 {

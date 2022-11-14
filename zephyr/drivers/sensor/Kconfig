@@ -21,7 +21,7 @@ config SENSOR_INIT_PRIORITY
 	  Sensor initialization priority.
 
 config SENSOR_SHELL
-	bool "Enable sensor shell"
+	bool "Sensor shell"
 	depends on SHELL
 	select CBPRINTF_FP_SUPPORT
 	default y if !SHELL_MINIMAL
@@ -29,12 +29,15 @@ config SENSOR_SHELL
 	  This shell provides access to basic sensor data.
 
 config SENSOR_SHELL_BATTERY
-	bool "Enable sensor shell 'battery' command"
+	bool "Sensor shell 'battery' command"
 	depends on SHELL
 	help
 	  This enables the 'battery' command which reports charging information
 	  in a convenient format. It makes use of a fuel gauge to read its
 	  information.
+
+config SENSOR_INFO
+	bool "Sensor Info iterable section"
 
 comment "Device Drivers"
 
@@ -80,6 +83,8 @@ source "drivers/sensor/dht/Kconfig"
 
 source "drivers/sensor/dps310/Kconfig"
 
+source "drivers/sensor/ds18b20/Kconfig"
+
 source "drivers/sensor/ens210/Kconfig"
 
 source "drivers/sensor/fdc2x1x/Kconfig"
@@ -103,6 +108,8 @@ source "drivers/sensor/hts221/Kconfig"
 source "drivers/sensor/i3g4250d/Kconfig"
 
 source "drivers/sensor/icm42605/Kconfig"
+
+source "drivers/sensor/icm42670/Kconfig"
 
 source "drivers/sensor/iis2dh/Kconfig"
 
@@ -160,6 +167,8 @@ source "drivers/sensor/max17262/Kconfig"
 
 source "drivers/sensor/max30101/Kconfig"
 
+source "drivers/sensor/max31875/Kconfig"
+
 source "drivers/sensor/max44009/Kconfig"
 
 source "drivers/sensor/max6675/Kconfig"
@@ -168,9 +177,13 @@ source "drivers/sensor/mchp_tach_xec/Kconfig"
 
 source "drivers/sensor/mcp9808/Kconfig"
 
+source "drivers/sensor/mhz19b/Kconfig"
+
 source "drivers/sensor/mpr/Kconfig"
 
 source "drivers/sensor/mpu6050/Kconfig"
+
+source "drivers/sensor/mpu9250/Kconfig"
 
 source "drivers/sensor/ms5837/Kconfig"
 
@@ -185,6 +198,8 @@ source "drivers/sensor/pms7003/Kconfig"
 source "drivers/sensor/qdec_nrfx/Kconfig"
 
 source "drivers/sensor/qdec_sam/Kconfig"
+
+source "drivers/sensor/qdec_stm32/Kconfig"
 
 source "drivers/sensor/sbs_gauge/Kconfig"
 
@@ -208,6 +223,8 @@ source "drivers/sensor/sm351lt/Kconfig"
 
 source "drivers/sensor/stm32_temp/Kconfig"
 
+source "drivers/sensor/stm32_vbat/Kconfig"
+
 source "drivers/sensor/stts751/Kconfig"
 
 source "drivers/sensor/sx9500/Kconfig"
@@ -215,6 +232,8 @@ source "drivers/sensor/sx9500/Kconfig"
 source "drivers/sensor/th02/Kconfig"
 
 source "drivers/sensor/tmp007/Kconfig"
+
+source "drivers/sensor/tmp108/Kconfig"
 
 source "drivers/sensor/tmp112/Kconfig"
 
@@ -226,10 +245,20 @@ source "drivers/sensor/vl53l0x/Kconfig"
 
 source "drivers/sensor/nxp_kinetis_temp/Kconfig"
 
+source "drivers/sensor/wsen_hids/Kconfig"
+
 source "drivers/sensor/wsen_itds/Kconfig"
 
 source "drivers/sensor/mcux_acmp/Kconfig"
 
 source "drivers/sensor/nuvoton_tach_npcx/Kconfig"
+
+source "drivers/sensor/nuvoton_adc_cmp_npcx/Kconfig"
+
+source "drivers/sensor/ite_tach_it8xxx2/Kconfig"
+
+source "drivers/sensor/ite_vcmp_it8xxx2/Kconfig"
+
+source "drivers/sensor/pcnt_esp32/Kconfig"
 
 endif # SENSOR

@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_test, LOG_LEVEL_WRN);
 
-#include <net/mqtt.h>
-#include <net/socket.h>
-#include <ztest.h>
+#include <zephyr/net/mqtt.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/ztest.h>
 
 #include <string.h>
 #include <errno.h>
 
-#include <random/rand32.h>
+#include <zephyr/random/rand32.h>
 
 #include "config.h"
 
@@ -296,22 +296,22 @@ static int test_disconnect(void)
 
 void test_mqtt_connect(void)
 {
-	zassert_true(test_connect() == TC_PASS, NULL);
+	zassert_true(test_connect() == TC_PASS);
 }
 
 void test_mqtt_pingreq(void)
 {
-	zassert_true(test_pingreq() == TC_PASS, NULL);
+	zassert_true(test_pingreq() == TC_PASS);
 }
 
 void test_mqtt_publish(void)
 {
-	zassert_true(test_publish(MQTT_QOS_0_AT_MOST_ONCE) == TC_PASS, NULL);
-	zassert_true(test_publish(MQTT_QOS_1_AT_LEAST_ONCE) == TC_PASS, NULL);
-	zassert_true(test_publish(MQTT_QOS_2_EXACTLY_ONCE) == TC_PASS, NULL);
+	zassert_true(test_publish(MQTT_QOS_0_AT_MOST_ONCE) == TC_PASS);
+	zassert_true(test_publish(MQTT_QOS_1_AT_LEAST_ONCE) == TC_PASS);
+	zassert_true(test_publish(MQTT_QOS_2_EXACTLY_ONCE) == TC_PASS);
 }
 
 void test_mqtt_disconnect(void)
 {
-	zassert_true(test_disconnect() == TC_PASS, NULL);
+	zassert_true(test_disconnect() == TC_PASS);
 }

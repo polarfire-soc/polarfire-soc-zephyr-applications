@@ -5,25 +5,14 @@
  */
 
 #include <string.h>
-#include <device.h>
-#include <sys/atomic.h>
-#include <syscall_handler.h>
-
-extern const struct init_entry __init_start[];
-extern const struct init_entry __init_PRE_KERNEL_1_start[];
-extern const struct init_entry __init_PRE_KERNEL_2_start[];
-extern const struct init_entry __init_POST_KERNEL_start[];
-extern const struct init_entry __init_APPLICATION_start[];
-extern const struct init_entry __init_end[];
-
-#ifdef CONFIG_SMP
-extern const struct init_entry __init_SMP_start[];
-#endif
+#include <zephyr/device.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/kobject.h>
+#include <zephyr/syscall_handler.h>
 
 extern const struct device __device_start[];
 extern const struct device __device_end[];
 
-extern uint32_t __device_init_status_start[];
 
 /**
  * @brief Initialize state for all static devices.
@@ -38,54 +27,6 @@ void z_device_state_init(void)
 	while (dev < __device_end) {
 		z_object_init(dev);
 		++dev;
-	}
-}
-
-/**
- * @brief Execute all the init entry initialization functions at a given level
- *
- * @details Invokes the initialization routine for each init entry object
- * created by the INIT_ENTRY_DEFINE() macro using the specified level.
- * The linker script places the init entry objects in memory in the order
- * they need to be invoked, with symbols indicating where one level leaves
- * off and the next one begins.
- *
- * @param level init level to run.
- */
-void z_sys_init_run_level(int32_t level)
-{
-	static const struct init_entry *levels[] = {
-		__init_PRE_KERNEL_1_start,
-		__init_PRE_KERNEL_2_start,
-		__init_POST_KERNEL_start,
-		__init_APPLICATION_start,
-#ifdef CONFIG_SMP
-		__init_SMP_start,
-#endif
-		/* End marker */
-		__init_end,
-	};
-	const struct init_entry *entry;
-
-	for (entry = levels[level]; entry < levels[level+1]; entry++) {
-		const struct device *dev = entry->dev;
-		int rc = entry->init(dev);
-
-		if (dev != NULL) {
-			/* Mark device initialized.  If initialization
-			 * failed, record the error condition.
-			 */
-			if (rc != 0) {
-				if (rc < 0) {
-					rc = -rc;
-				}
-				if (rc > UINT8_MAX) {
-					rc = UINT8_MAX;
-				}
-				dev->state->init_res = rc;
-			}
-			dev->state->initialized = true;
-		}
 	}
 }
 
@@ -106,13 +47,13 @@ const struct device *z_impl_device_get_binding(const char *name)
 	 * performed. Reserve string comparisons for a fallback.
 	 */
 	for (dev = __device_start; dev != __device_end; dev++) {
-		if (z_device_ready(dev) && (dev->name == name)) {
+		if (z_device_is_ready(dev) && (dev->name == name)) {
 			return dev;
 		}
 	}
 
 	for (dev = __device_start; dev != __device_end; dev++) {
-		if (z_device_ready(dev) && (strcmp(name, dev->name) == 0)) {
+		if (z_device_is_ready(dev) && (strcmp(name, dev->name) == 0)) {
 			return dev;
 		}
 	}
@@ -134,13 +75,13 @@ static inline const struct device *z_vrfy_device_get_binding(const char *name)
 }
 #include <syscalls/device_get_binding_mrsh.c>
 
-static inline int z_vrfy_device_usable_check(const struct device *dev)
+static inline bool z_vrfy_device_is_ready(const struct device *dev)
 {
 	Z_OOPS(Z_SYSCALL_OBJ_INIT(dev, K_OBJ_ANY));
 
-	return z_impl_device_usable_check(dev);
+	return z_impl_device_is_ready(dev);
 }
-#include <syscalls/device_usable_check_mrsh.c>
+#include <syscalls/device_is_ready_mrsh.c>
 #endif /* CONFIG_USERSPACE */
 
 size_t z_device_get_all_static(struct device const **devices)
@@ -149,7 +90,7 @@ size_t z_device_get_all_static(struct device const **devices)
 	return __device_end - __device_start;
 }
 
-bool z_device_ready(const struct device *dev)
+bool z_device_is_ready(const struct device *dev)
 {
 	/*
 	 * if an invalid device pointer is passed as argument, this call
@@ -162,14 +103,11 @@ bool z_device_ready(const struct device *dev)
 	return dev->state->initialized && (dev->state->init_res == 0U);
 }
 
-int device_required_foreach(const struct device *dev,
-			  device_visitor_callback_t visitor_cb,
-			  void *context)
+static int device_visitor(const device_handle_t *handles,
+			   size_t handle_count,
+			   device_visitor_callback_t visitor_cb,
+			   void *context)
 {
-	size_t handle_count = 0;
-	const device_handle_t *handles =
-		device_required_handles_get(dev, &handle_count);
-
 	/* Iterate over fixed devices */
 	for (size_t i = 0; i < handle_count; ++i) {
 		device_handle_t dh = handles[i];
@@ -182,4 +120,24 @@ int device_required_foreach(const struct device *dev,
 	}
 
 	return handle_count;
+}
+
+int device_required_foreach(const struct device *dev,
+			    device_visitor_callback_t visitor_cb,
+			    void *context)
+{
+	size_t handle_count = 0;
+	const device_handle_t *handles = device_required_handles_get(dev, &handle_count);
+
+	return device_visitor(handles, handle_count, visitor_cb, context);
+}
+
+int device_supported_foreach(const struct device *dev,
+			     device_visitor_callback_t visitor_cb,
+			     void *context)
+{
+	size_t handle_count = 0;
+	const device_handle_t *handles = device_supported_handles_get(dev, &handle_count);
+
+	return device_visitor(handles, handle_count, visitor_cb, context);
 }

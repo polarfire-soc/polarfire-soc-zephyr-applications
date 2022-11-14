@@ -5,10 +5,10 @@
  *
  * Not Recently Used (NRU) eviction algorithm for demand paging
  */
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <mmu.h>
 #include <kernel_arch_interface.h>
-#include <init.h>
+#include <zephyr/init.h>
 
 /* The accessed and dirty states of each page frame are used to create
  * a hierarchy with a numerical value. When evicting a page, try to evict
@@ -26,7 +26,7 @@ static void nru_periodic_update(struct k_timer *timer)
 {
 	uintptr_t phys;
 	struct z_page_frame *pf;
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 
 	Z_PAGE_FRAME_FOREACH(phys, pf) {
 		if (!z_page_frame_is_evictable(pf)) {

@@ -34,12 +34,80 @@ zephyr_library_sources_ifdef(
   vcs_client.c
   )
 zephyr_library_sources_ifdef(
-  CONFIG_BT_MICS
-  mics.c
+  CONFIG_BT_MICP_MIC_DEV
+  micp_mic_dev.c
   )
 zephyr_library_sources_ifdef(
-  CONFIG_BT_MICS_CLIENT
-  mics_client.c
+  CONFIG_BT_MICP_MIC_CTLR
+  micp_mic_ctlr.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_CSIS
+  csis.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_CSIS_CLIENT
+  csis_client.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_TBS
+  tbs.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_TBS_CLIENT
+  tbs_client.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_MPL
+  mpl.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_MCC
+  mcc.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_MCS
+  media_controller.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_HAS_PRESET_SUPPORT
+  has.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_CAP_ACCEPTOR
+  cap_acceptor.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_CAP_INITIATOR
+  cap_initiator.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_HAS_CLIENT
+  has_client.c
+  )
+# We use BT_AUDIO_STREAM as a common ground for audio, as that is set whenever
+# any audio stream functionality is enabled.
+zephyr_library_sources_ifdef(
+  CONFIG_BT_AUDIO_STREAM
+  audio.c
+  )
+
+zephyr_library_sources_ifdef(
+  CONFIG_BT_BASS
+  bass.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_BASS_CLIENT
+  bass_client.c
+  )
+
+zephyr_library_sources_ifdef(
+  CONFIG_BT_IAS
+  ias.c
+  )
+zephyr_library_sources_ifdef(
+  CONFIG_BT_IAS_CLIENT
+  ias_client.c
   )
 
 if(CONFIG_BT_CTLR AND CONFIG_BT_LL_SW_SPLIT)

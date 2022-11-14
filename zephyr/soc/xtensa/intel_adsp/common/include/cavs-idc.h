@@ -6,6 +6,8 @@
 #ifndef ZEPHYR_SOC_INTEL_ADSP_CAVS_IDC_H_
 #define ZEPHYR_SOC_INTEL_ADSP_CAVS_IDC_H_
 
+#include <intel_adsp_ipc_devtree.h>
+
 /*
  * (I)ntra (D)SP (C)ommunication is the facility for sending
  * interrupts directly between DSP cores.  The interface
@@ -42,7 +44,7 @@
  *     IDC[src].core[dst].itc = BIT(31) | message;
  *     while (IDC[src].core[dst].itc & BIT(31)) {}
  *
- * And the other side (on cpu "dst", generally in the IDC interruupt
+ * And the other side (on cpu "dst", generally in the IDC interrupt
  * handler) will read and acknowledge those same values via:
  *
  *     uint32_t my_msg = IDC[dst].core[src].tfc & 0x7fffffff;
@@ -53,14 +55,14 @@
  *     IDC[src].core[dst].itc == IDC[dst].core[src].tfc
  *
  * Finally note the two control registers at the end of each core's
- * register block, which store a bitmask of cores that are allowed to
- * send that core an interrupt via either ITC (set high "BUSY" bit) or
+ * register block, which store a bitmask of cores that it is allowed
+ * to signal with an interrupt via either ITC (set high "BUSY" bit) or
  * TFC (clear high "DONE" bit).  This masking is in ADDITION to the
  * level 2 bit for IDC in the per-core INTCTRL DSP register AND the
  * Xtensa architectural INTENABLE SR.  You must enable IDC interrupts
  * form core "src" to core "dst" with:
  *
- *     IDC[dst].busy_int |= BIT(src)  // Or disable with "&= ~BIT(src)" of course
+ *     IDC[src].busy_int |= BIT(dst)  // Or disable with "&= ~BIT(dst)" of course
  */
 struct cavs_idc {
 	struct {
@@ -77,7 +79,7 @@ struct cavs_idc {
 	uint32_t unused3[11];
 };
 
-#define IDC ((volatile struct cavs_idc *)DT_REG_ADDR(DT_NODELABEL(idc)))
+#define IDC ((volatile struct cavs_idc *)INTEL_ADSP_IDC_REG_ADDRESS)
 
 extern void soc_idc_init(void);
 
@@ -143,6 +145,6 @@ struct cavs_intctrl {
 #define CAVS_L5_I2S(n)     BIT(n)	/* I2S */
 
 #define CAVS_INTCTRL \
-	((volatile struct cavs_intctrl *)DT_REG_ADDR(DT_NODELABEL(cavs0)))
+	((volatile struct cavs_intctrl *)DT_REG_ADDR(DT_NODELABEL(cavs_intc0)))
 
 #endif /* ZEPHYR_SOC_INTEL_ADSP_CAVS_IDC_H_ */

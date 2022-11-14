@@ -6,16 +6,16 @@
 
 #define DT_DRV_COMPAT sensirion_sht4x
 
-#include <device.h>
-#include <drivers/i2c.h>
-#include <kernel.h>
-#include <drivers/sensor.h>
-#include <sys/__assert.h>
-#include <logging/log.h>
-#include <sys/byteorder.h>
-#include <sys/crc.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/crc.h>
 
-#include <drivers/sensor/sht4x.h>
+#include <zephyr/drivers/sensor/sht4x.h>
 #include "sht4x.h"
 
 LOG_MODULE_REGISTER(SHT4X, CONFIG_SENSOR_LOG_LEVEL);
@@ -216,7 +216,7 @@ static const struct sensor_driver_api sht4x_api = {
 		.repeatability = DT_INST_PROP(n, repeatability)	\
 	};							\
 								\
-	DEVICE_DT_INST_DEFINE(n,				\
+	SENSOR_DEVICE_DT_INST_DEFINE(n,				\
 			      sht4x_init,			\
 			      NULL,				\
 			      &sht4x_data_##n,			\

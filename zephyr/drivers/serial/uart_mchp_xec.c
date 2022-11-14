@@ -16,22 +16,23 @@
 #define DT_DRV_COMPAT microchip_xec_uart
 
 #include <errno.h>
-#include <kernel.h>
-#include <arch/cpu.h>
+#include <zephyr/kernel.h>
+#include <zephyr/arch/cpu.h>
 #include <zephyr/types.h>
 #include <soc.h>
 
-#include <init.h>
-#include <toolchain.h>
-#include <linker/sections.h>
-#include <drivers/clock_control/mchp_xec_clock_control.h>
-#include <drivers/interrupt_controller/intc_mchp_xec_ecia.h>
-#include <drivers/uart.h>
-#include <sys/sys_io.h>
-#include <spinlock.h>
-
-BUILD_ASSERT(IS_ENABLED(CONFIG_SOC_SERIES_MEC172X),
-	     "XEC UART driver only support MEC172x at this time");
+#include <zephyr/init.h>
+#include <zephyr/toolchain.h>
+#include <zephyr/linker/sections.h>
+#ifdef CONFIG_SOC_SERIES_MEC172X
+#include <zephyr/drivers/clock_control/mchp_xec_clock_control.h>
+#include <zephyr/drivers/interrupt_controller/intc_mchp_xec_ecia.h>
+#endif
+#include <zephyr/drivers/pinctrl.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/sys/sys_io.h>
+#include <zephyr/spinlock.h>
+#include <zephyr/irq.h>
 
 /* Clock source is 1.8432 MHz derived from PLL 48 MHz */
 #define XEC_UART_CLK_SRC_1P8M		0
@@ -163,14 +164,7 @@ BUILD_ASSERT(IS_ENABLED(CONFIG_SOC_SERIES_MEC172X),
 #define MSR_RI 0x40   /* complement of ring signal */
 #define MSR_DCD 0x80  /* complement of dcd */
 
-/* convenience defines */
-
-#define DEV_CFG(dev) \
-	((const struct uart_xec_device_config * const)(dev)->config)
-#define DEV_DATA(dev) \
-	((struct uart_xec_dev_data *)(dev)->data)
-
-#define IIRC(dev) (DEV_DATA(dev)->iir_cache)
+#define IIRC(dev) (((struct uart_xec_dev_data *)(dev)->data)->iir_cache)
 
 /* device config */
 struct uart_xec_device_config {
@@ -180,6 +174,7 @@ struct uart_xec_device_config {
 	uint8_t girq_pos;
 	uint8_t pcr_idx;
 	uint8_t pcr_bitpos;
+	const struct pinctrl_dev_config *pcfg;
 #if defined(CONFIG_UART_INTERRUPT_DRIVEN) || defined(CONFIG_UART_ASYNC_API)
 	uart_irq_config_func_t	irq_config_func;
 #endif
@@ -200,10 +195,60 @@ struct uart_xec_dev_data {
 
 static const struct uart_driver_api uart_xec_driver_api;
 
+#ifdef CONFIG_SOC_SERIES_MEC172X
+
+static void uart_clr_slp_en(const struct device *dev)
+{
+	struct uart_xec_device_config const *dev_cfg = dev->config;
+
+	z_mchp_xec_pcr_periph_sleep(dev_cfg->pcr_idx, dev_cfg->pcr_bitpos, 0);
+}
+
+static inline void uart_xec_girq_clr(const struct device *dev)
+{
+	struct uart_xec_device_config const *dev_cfg = dev->config;
+
+	mchp_soc_ecia_girq_src_clr(dev_cfg->girq_id, dev_cfg->girq_pos);
+}
+
+static inline void uart_xec_girq_en(uint8_t girq_idx, uint8_t girq_posn)
+{
+	mchp_xec_ecia_girq_src_en(girq_idx, girq_posn);
+}
+
+#else
+
+static void uart_clr_slp_en(const struct device *dev)
+{
+	struct uart_xec_device_config const *dev_cfg = dev->config;
+
+	if (dev_cfg->pcr_bitpos == MCHP_PCR2_UART0_POS) {
+		mchp_pcr_periph_slp_ctrl(PCR_UART0, 0);
+	} else if (dev_cfg->pcr_bitpos == MCHP_PCR2_UART1_POS) {
+		mchp_pcr_periph_slp_ctrl(PCR_UART1, 0);
+	} else {
+		mchp_pcr_periph_slp_ctrl(PCR_UART2, 0);
+	}
+}
+
+static inline void uart_xec_girq_clr(const struct device *dev)
+{
+	struct uart_xec_device_config const *dev_cfg = dev->config;
+
+	MCHP_GIRQ_SRC(dev_cfg->girq_id) = BIT(dev_cfg->girq_pos);
+}
+
+static inline void uart_xec_girq_en(uint8_t girq_idx, uint8_t girq_posn)
+{
+	MCHP_GIRQ_ENSET(girq_idx) = BIT(girq_posn);
+}
+
+#endif
+
 static void set_baud_rate(const struct device *dev, uint32_t baud_rate)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
-	struct uart_xec_dev_data * const dev_data = DEV_DATA(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data * const dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
 	uint32_t divisor; /* baud rate divisor */
 	uint8_t lcr_cache;
@@ -239,8 +284,8 @@ static void set_baud_rate(const struct device *dev, uint32_t baud_rate)
 static int uart_xec_configure(const struct device *dev,
 			      const struct uart_config *cfg)
 {
-	struct uart_xec_dev_data * const dev_data = DEV_DATA(dev);
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	struct uart_xec_dev_data * const dev_data = dev->data;
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
 	struct uart_regs *regs = dev_cfg->regs;
 	uint8_t lcr_cache;
 
@@ -341,7 +386,7 @@ out:
 static int uart_xec_config_get(const struct device *dev,
 			       struct uart_config *cfg)
 {
-	struct uart_xec_dev_data *data = DEV_DATA(dev);
+	struct uart_xec_dev_data *data = dev->data;
 
 	cfg->baudrate = data->uart_config.baudrate;
 	cfg->parity = data->uart_config.parity;
@@ -364,16 +409,18 @@ static int uart_xec_config_get(const struct device *dev,
  */
 static int uart_xec_init(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	int ret;
 
-	ret = z_mchp_xec_pcr_periph_sleep(dev_cfg->pcr_idx,
-					  dev_cfg->pcr_bitpos, 0);
+	uart_clr_slp_en(dev);
+
+	ret = pinctrl_apply_state(dev_cfg->pcfg, PINCTRL_STATE_DEFAULT);
 	if (ret != 0) {
 		return ret;
 	}
 
-	ret = uart_xec_configure(dev, &DEV_DATA(dev)->uart_config);
+	ret = uart_xec_configure(dev, &dev_data->uart_config);
 	if (ret != 0) {
 		return ret;
 	}
@@ -395,10 +442,11 @@ static int uart_xec_init(const struct device *dev)
  */
 static int uart_xec_poll_in(const struct device *dev, unsigned char *c)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
 	int ret = -1;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	if ((regs->LSR & LSR_RXRDY) != 0) {
 		/* got a character */
@@ -406,7 +454,7 @@ static int uart_xec_poll_in(const struct device *dev, unsigned char *c)
 		ret = 0;
 	}
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return ret;
 }
@@ -425,9 +473,10 @@ static int uart_xec_poll_in(const struct device *dev, unsigned char *c)
  */
 static void uart_xec_poll_out(const struct device *dev, unsigned char c)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	while ((regs->LSR & LSR_THRE) == 0) {
 		;
@@ -435,7 +484,7 @@ static void uart_xec_poll_out(const struct device *dev, unsigned char c)
 
 	regs->RTXB = c;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 }
 
 /**
@@ -448,12 +497,13 @@ static void uart_xec_poll_out(const struct device *dev, unsigned char c)
  */
 static int uart_xec_err_check(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 	int check = regs->LSR & LSR_EOB_MASK;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return check >> 1;
 }
@@ -472,16 +522,17 @@ static int uart_xec_err_check(const struct device *dev)
 static int uart_xec_fifo_fill(const struct device *dev, const uint8_t *tx_data,
 			      int size)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
 	int i;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	for (i = 0; (i < size) && (regs->LSR & LSR_THRE) != 0; i++) {
 		regs->RTXB = tx_data[i];
 	}
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return i;
 }
@@ -498,16 +549,17 @@ static int uart_xec_fifo_fill(const struct device *dev, const uint8_t *tx_data,
 static int uart_xec_fifo_read(const struct device *dev, uint8_t *rx_data,
 			      const int size)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
 	int i;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	for (i = 0; (i < size) && (regs->LSR & LSR_RXRDY) != 0; i++) {
 		rx_data[i] = regs->RTXB;
 	}
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return i;
 }
@@ -516,36 +568,34 @@ static int uart_xec_fifo_read(const struct device *dev, uint8_t *rx_data,
  * @brief Enable TX interrupt in IER
  *
  * @param dev UART device struct
- *
- * @return N/A
  */
 static void uart_xec_irq_tx_enable(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	regs->IER |= IER_TBE;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 }
 
 /**
  * @brief Disable TX interrupt in IER
  *
  * @param dev UART device struct
- *
- * @return N/A
  */
 static void uart_xec_irq_tx_disable(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	regs->IER &= ~(IER_TBE);
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 }
 
 /**
@@ -557,11 +607,12 @@ static void uart_xec_irq_tx_disable(const struct device *dev)
  */
 static int uart_xec_irq_tx_ready(const struct device *dev)
 {
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	struct uart_xec_dev_data *dev_data = dev->data;
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	int ret = ((IIRC(dev) & IIR_ID) == IIR_THRE) ? 1 : 0;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return ret;
 }
@@ -575,14 +626,15 @@ static int uart_xec_irq_tx_ready(const struct device *dev)
  */
 static int uart_xec_irq_tx_complete(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	int ret = ((regs->LSR & (LSR_TEMT | LSR_THRE))
 				== (LSR_TEMT | LSR_THRE)) ? 1 : 0;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return ret;
 }
@@ -591,36 +643,34 @@ static int uart_xec_irq_tx_complete(const struct device *dev)
  * @brief Enable RX interrupt in IER
  *
  * @param dev UART device struct
- *
- * @return N/A
  */
 static void uart_xec_irq_rx_enable(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	regs->IER |= IER_RXRDY;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 }
 
 /**
  * @brief Disable RX interrupt in IER
  *
  * @param dev UART device struct
- *
- * @return N/A
  */
 static void uart_xec_irq_rx_disable(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	regs->IER &= ~(IER_RXRDY);
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 }
 
 /**
@@ -632,11 +682,12 @@ static void uart_xec_irq_rx_disable(const struct device *dev)
  */
 static int uart_xec_irq_rx_ready(const struct device *dev)
 {
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	struct uart_xec_dev_data *dev_data = dev->data;
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	int ret = ((IIRC(dev) & IIR_ID) == IIR_RBRF) ? 1 : 0;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return ret;
 }
@@ -645,18 +696,17 @@ static int uart_xec_irq_rx_ready(const struct device *dev)
  * @brief Enable error interrupt in IER
  *
  * @param dev UART device struct
- *
- * @return N/A
  */
 static void uart_xec_irq_err_enable(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	regs->IER |= IER_LSR;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 }
 
 /**
@@ -668,13 +718,14 @@ static void uart_xec_irq_err_enable(const struct device *dev)
  */
 static void uart_xec_irq_err_disable(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	regs->IER &= ~(IER_LSR);
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 }
 
 /**
@@ -686,11 +737,12 @@ static void uart_xec_irq_err_disable(const struct device *dev)
  */
 static int uart_xec_irq_is_pending(const struct device *dev)
 {
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	struct uart_xec_dev_data *dev_data = dev->data;
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	int ret = (!(IIRC(dev) & IIR_NIP)) ? 1 : 0;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return ret;
 }
@@ -704,13 +756,14 @@ static int uart_xec_irq_is_pending(const struct device *dev)
  */
 static int uart_xec_irq_update(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
-	k_spinlock_key_t key = k_spin_lock(&DEV_DATA(dev)->lock);
+	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	IIRC(dev) = regs->IIR_FCR;
 
-	k_spin_unlock(&DEV_DATA(dev)->lock, key);
+	k_spin_unlock(&dev_data->lock, key);
 
 	return 1;
 }
@@ -720,14 +773,12 @@ static int uart_xec_irq_update(const struct device *dev)
  *
  * @param dev UART device struct
  * @param cb Callback function pointer.
- *
- * @return N/A
  */
 static void uart_xec_irq_callback_set(const struct device *dev,
 				      uart_irq_callback_user_data_t cb,
 				      void *cb_data)
 {
-	struct uart_xec_dev_data * const dev_data = DEV_DATA(dev);
+	struct uart_xec_dev_data * const dev_data = dev->data;
 	k_spinlock_key_t key = k_spin_lock(&dev_data->lock);
 
 	dev_data->cb = cb;
@@ -742,20 +793,17 @@ static void uart_xec_irq_callback_set(const struct device *dev,
  * This simply calls the callback function, if one exists.
  *
  * @param arg Argument to ISR.
- *
- * @return N/A
  */
 static void uart_xec_isr(const struct device *dev)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
-	struct uart_xec_dev_data * const dev_data = DEV_DATA(dev);
+	struct uart_xec_dev_data * const dev_data = dev->data;
 
 	if (dev_data->cb) {
 		dev_data->cb(dev, dev_data->cb_data);
 	}
 
 	/* clear ECIA GIRQ R/W1C status bit after UART status cleared */
-	mchp_xec_ecia_girq_src_clr(dev_cfg->girq_id, dev_cfg->girq_pos);
+	uart_xec_girq_clr(dev);
 }
 
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
@@ -774,7 +822,8 @@ static void uart_xec_isr(const struct device *dev)
 static int uart_xec_line_ctrl_set(const struct device *dev,
 				  uint32_t ctrl, uint32_t val)
 {
-	const struct uart_xec_device_config * const dev_cfg = DEV_CFG(dev);
+	const struct uart_xec_device_config * const dev_cfg = dev->config;
+	struct uart_xec_dev_data *dev_data = dev->data;
 	struct uart_regs *regs = dev_cfg->regs;
 	uint32_t mdc, chg;
 	k_spinlock_key_t key;
@@ -786,7 +835,7 @@ static int uart_xec_line_ctrl_set(const struct device *dev,
 
 	case UART_LINE_CTRL_RTS:
 	case UART_LINE_CTRL_DTR:
-		key = k_spin_lock(&DEV_DATA(dev)->lock);
+		key = k_spin_lock(&dev_data->lock);
 		mdc = regs->MCR;
 
 		if (ctrl == UART_LINE_CTRL_RTS) {
@@ -801,7 +850,7 @@ static int uart_xec_line_ctrl_set(const struct device *dev,
 			mdc &= ~(chg);
 		}
 		regs->MCR = mdc;
-		k_spin_unlock(&DEV_DATA(dev)->lock, key);
+		k_spin_unlock(&dev_data->lock, key);
 		return 0;
 	}
 
@@ -858,7 +907,7 @@ static const struct uart_driver_api uart_xec_driver_api = {
 			    uart_xec_isr, DEVICE_DT_INST_GET(n),	\
 			    0);						\
 		irq_enable(DT_INST_IRQN(n));				\
-		mchp_xec_ecia_girq_src_en(DT_INST_PROP_BY_IDX(n, girqs, 0), \
+		uart_xec_girq_en(DT_INST_PROP_BY_IDX(n, girqs, 0), \
 					  DT_INST_PROP_BY_IDX(n, girqs, 1)); \
 	}
 #else
@@ -872,6 +921,9 @@ static const struct uart_driver_api uart_xec_driver_api = {
 	DT_INST_PROP_OR(n, hw_flow_control, UART_CFG_FLOW_CTRL_NONE)
 
 #define UART_XEC_DEVICE_INIT(n)						\
+									\
+	PINCTRL_DT_INST_DEFINE(n);					\
+									\
 	UART_XEC_IRQ_FUNC_DECLARE(n);					\
 									\
 	static const struct uart_xec_device_config uart_xec_dev_cfg_##n = { \
@@ -881,6 +933,7 @@ static const struct uart_driver_api uart_xec_driver_api = {
 		.girq_pos = DT_INST_PROP_BY_IDX(n, girqs, 1),		\
 		.pcr_idx = DT_INST_PROP_BY_IDX(n, pcrs, 0),		\
 		.pcr_bitpos = DT_INST_PROP_BY_IDX(n, pcrs, 1),		\
+		.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(n),		\
 		DEV_CONFIG_IRQ_FUNC_INIT(n)				\
 	};								\
 	static struct uart_xec_dev_data uart_xec_dev_data_##n = {	\

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <kernel.h>
+#include <zephyr/ztest.h>
+#include <zephyr/kernel.h>
 #include <cmsis_os.h>
 
 struct mem_block {
@@ -23,7 +23,7 @@ osPoolDef(MemPool, MAX_BLOCKS, struct mem_block);
  * @see osPoolCreate(), osPoolAlloc(), osPoolFree(),
  * osPoolCAlloc(), memcmp()
  */
-void test_mempool(void)
+ZTEST(cmsis_mempool, test_mempool)
 {
 	int i;
 	osPoolId mempool_id;
@@ -64,3 +64,4 @@ void test_mempool(void)
 		zassert_true(status_list[i] == osOK, "mempool free failed");
 	}
 }
+ZTEST_SUITE(cmsis_mempool, NULL, NULL, NULL, NULL, NULL);

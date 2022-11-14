@@ -4,15 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 #include <soc.h>
-#include <bluetooth/hci.h>
-#include <sys/byteorder.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/sys/byteorder.h>
 
 #include "util/util.h"
 #include "util/memq.h"
 #include "util/mem.h"
 #include "util/mayfly.h"
+#include "util/dbuf.h"
 
 #include "hal/cpu.h"
 #include "hal/ccm.h"
@@ -35,6 +36,11 @@
 #include "lll_conn.h"
 #include "lll_central.h"
 #include "lll_filter.h"
+#include "lll_conn_iso.h"
+
+#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
+#include "ull_tx_queue.h"
+#endif /* !CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #include "ull_adv_types.h"
 #include "ull_scan_types.h"
@@ -50,6 +56,14 @@
 #include "ll.h"
 #include "ll_feat.h"
 #include "ll_settings.h"
+
+#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
+#include "isoal.h"
+#include "ull_iso_types.h"
+#include "ull_conn_iso_types.h"
+
+#include "ull_llcp.h"
+#endif /* !CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
 #define LOG_MODULE_NAME bt_ctlr_ull_central
@@ -202,6 +216,17 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 	conn_lll->nesn = 0;
 	conn_lll->empty = 0;
 
+#if defined(CONFIG_BT_CTLR_PHY)
+	/* Use the default 1M PHY, extended connection initiation in LLL will
+	 * update this with the correct PHY.
+	 */
+	conn_lll->phy_tx = PHY_1M;
+	conn_lll->phy_flags = 0;
+	conn_lll->phy_tx_time = PHY_1M;
+	conn_lll->phy_rx = PHY_1M;
+#endif /* CONFIG_BT_CTLR_PHY */
+
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 	conn_lll->max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
 	conn_lll->max_rx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
@@ -214,16 +239,11 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 	conn_lll->max_rx_time = PDU_DC_MAX_US(PDU_DC_PAYLOAD_SIZE_MIN, PHY_1M);
 #endif /* CONFIG_BT_CTLR_PHY */
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
-
-#if defined(CONFIG_BT_CTLR_PHY)
-	/* Use the default 1M PHY, extended connection initiation in LLL will
-	 * update this with the correct PHY.
-	 */
-	conn_lll->phy_tx = PHY_1M;
-	conn_lll->phy_flags = 0;
-	conn_lll->phy_tx_time = PHY_1M;
-	conn_lll->phy_rx = PHY_1M;
-#endif /* CONFIG_BT_CTLR_PHY */
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
+	ull_dle_init(conn, PHY_1M);
+#endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 	conn_lll->rssi_latest = BT_HCI_LE_RSSI_NOT_AVAILABLE;
@@ -255,15 +275,26 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 	memset(&conn_lll->conn_meta, 0, sizeof(conn_lll->conn_meta));
 #endif /* CONFIG_BT_CTLR_CONN_META */
 
-	conn->connect_expire = 6U;
+#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX)
+	conn_lll->df_rx_cfg.is_initialized = 0U;
+	conn_lll->df_rx_cfg.hdr.elem_size = sizeof(struct lll_df_conn_rx_params);
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RX */
+#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
+	conn_lll->df_tx_cfg.is_initialized = 0U;
+	conn_lll->df_tx_cfg.cte_rsp_en = 0U;
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_TX */
+
+	conn->connect_expire = CONN_ESTAB_COUNTDOWN;
 	conn->supervision_expire = 0U;
 	conn_interval_us = (uint32_t)interval * CONN_INT_UNIT_US;
 	conn->supervision_reload = RADIO_CONN_EVENTS(timeout * 10000U,
 							 conn_interval_us);
 
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 	conn->procedure_expire = 0U;
 	conn->procedure_reload = RADIO_CONN_EVENTS(40000000,
 						       conn_interval_us);
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
 	conn->apto_expire = 0U;
@@ -279,6 +310,7 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 			     conn->apto_reload;
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 	conn->common.fex_valid = 0U;
 	conn->common.txn_lock = 0U;
 	conn->central.terminate_ack = 0U;
@@ -297,6 +329,12 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 	 * terminate ind rx node
 	 */
 	conn->llcp_terminate.node_rx.hdr.link = link;
+
+#if defined(CONFIG_BT_CTLR_RX_ENQUEUE_HOLD)
+	conn->llcp_rx_hold = NULL;
+	conn_lll->rx_hold_req = 0U;
+	conn_lll->rx_hold_ack = 0U;
+#endif /* CONFIG_BT_CTLR_RX_ENQUEUE_HOLD */
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
 	conn_lll->enc_rx = conn_lll->enc_tx = 0U;
@@ -332,6 +370,33 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 
 	conn->tx_head = conn->tx_ctrl = conn->tx_ctrl_last =
 	conn->tx_data = conn->tx_data_last = 0;
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+	/* Re-initialize the control procedure data structures */
+	ull_llcp_init(conn);
+
+	/* Setup the PRT reload */
+	ull_cp_prt_reload_set(conn, conn_interval_us);
+
+	conn->central.terminate_ack = 0U;
+
+	conn->llcp_terminate.reason_final = 0U;
+	/* NOTE: use allocated link for generating dedicated
+	 * terminate ind rx node
+	 */
+	conn->llcp_terminate.node_rx.hdr.link = link;
+
+#if defined(CONFIG_BT_CTLR_PHY)
+	conn->phy_pref_tx = ull_conn_default_phy_tx_get();
+	conn->phy_pref_rx = ull_conn_default_phy_rx_get();
+#endif /* CONFIG_BT_CTLR_PHY */
+
+#if defined(CONFIG_BT_CTLR_LE_ENC)
+	conn->pause_rx_data = 0U;
+#endif /* CONFIG_BT_CTLR_LE_ENC */
+
+	/* Re-initialize the Tx Q */
+	ull_tx_q_init(&conn->tx_q);
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 	/* TODO: active_to_start feature port */
 	conn->ull.ticks_active_to_start = 0U;
@@ -361,6 +426,7 @@ conn_is_valid:
 	ready_delay_us = lll_radio_tx_ready_delay_get(0, 0);
 #endif
 
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 #if defined(CONFIG_BT_CTLR_PHY)
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
@@ -387,6 +453,21 @@ conn_is_valid:
 			  PDU_DC_MAX_US(PDU_DC_PAYLOAD_SIZE_MIN, lll->phy));
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* !CONFIG_BT_CTLR_DATA_LENGTH */
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+	conn->lll.dle.eff.max_tx_time = MAX(conn->lll.dle.eff.max_tx_time,
+					    PDU_DC_MAX_US(PDU_DC_PAYLOAD_SIZE_MIN, lll->phy));
+	conn->lll.dle.eff.max_rx_time = MAX(conn->lll.dle.eff.max_rx_time,
+					    PDU_DC_MAX_US(PDU_DC_PAYLOAD_SIZE_MIN, lll->phy));
+#endif /* CONFIG_BT_CTLR_ADV_EXT */
+	max_tx_time = conn_lll->dle.eff.max_tx_time;
+	max_rx_time = conn_lll->dle.eff.max_rx_time;
+#else /* !CONFIG_BT_CTLR_DATA_LENGTH */
+	max_tx_time = PDU_DC_MAX_US(PDU_DC_PAYLOAD_SIZE_MIN, PHY_1M);
+	max_rx_time = PDU_DC_MAX_US(PDU_DC_PAYLOAD_SIZE_MIN, PHY_1M);
+#endif /* !CONFIG_BT_CTLR_DATA_LENGTH */
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 	conn->ull.ticks_slot =
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US +
@@ -572,7 +653,7 @@ uint8_t ll_connect_disable(void **rx)
 }
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
-uint8_t ll_enc_req_send(uint16_t handle, uint8_t const *const rand,
+uint8_t ll_enc_req_send(uint16_t handle, uint8_t const *const rand_num,
 		     uint8_t const *const ediv, uint8_t const *const ltk)
 {
 	struct ll_conn *conn;
@@ -583,6 +664,7 @@ uint8_t ll_enc_req_send(uint16_t handle, uint8_t const *const rand,
 		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 	if ((conn->llcp_enc.req != conn->llcp_enc.ack) ||
 	    ((conn->llcp_req != conn->llcp_ack) &&
 	     (conn->llcp_type == LLCP_ENCRYPTION))) {
@@ -594,6 +676,8 @@ uint8_t ll_enc_req_send(uint16_t handle, uint8_t const *const rand,
 		struct pdu_data *pdu_data_tx;
 
 		pdu_data_tx = (void *)tx->pdu;
+
+		ull_pdu_data_init(pdu_data_tx);
 
 		memcpy(&conn->llcp_enc.ltk[0], ltk, sizeof(conn->llcp_enc.ltk));
 
@@ -608,13 +692,13 @@ uint8_t ll_enc_req_send(uint16_t handle, uint8_t const *const rand,
 				PDU_DATA_LLCTRL_TYPE_ENC_REQ;
 			enc_req = (void *)
 				&pdu_data_tx->llctrl.enc_req;
-			memcpy(enc_req->rand, rand, sizeof(enc_req->rand));
+			memcpy(enc_req->rand, rand_num, sizeof(enc_req->rand));
 			enc_req->ediv[0] = ediv[0];
 			enc_req->ediv[1] = ediv[1];
 			lll_csrand_get(enc_req->skdm, sizeof(enc_req->skdm));
 			lll_csrand_get(enc_req->ivm, sizeof(enc_req->ivm));
 		} else if (conn->lll.enc_rx && conn->lll.enc_tx) {
-			memcpy(&conn->llcp_enc.rand[0], rand,
+			memcpy(&conn->llcp_enc.rand[0], rand_num,
 			       sizeof(conn->llcp_enc.rand));
 
 			conn->llcp_enc.ediv[0] = ediv[0];
@@ -641,6 +725,17 @@ uint8_t ll_enc_req_send(uint16_t handle, uint8_t const *const rand,
 
 		return 0;
 	}
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+	ARG_UNUSED(tx);
+
+	if (!conn->lll.enc_tx && !conn->lll.enc_rx) {
+		/* Encryption is fully disabled */
+		return ull_cp_encryption_start(conn, rand_num, ediv, ltk);
+	} else if (conn->lll.enc_tx && conn->lll.enc_rx) {
+		/* Encryption is fully enabled */
+		return ull_cp_encryption_pause(conn, rand_num, ediv, ltk);
+	}
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 	return BT_HCI_ERR_CMD_DISALLOWED;
 }
@@ -746,10 +841,12 @@ void ull_central_setup(struct node_rx_hdr *rx, struct node_rx_ftr *ftr,
 	struct pdu_adv *pdu_tx;
 	uint8_t peer_addr_type;
 	uint32_t ticker_status;
+	uint32_t ticks_at_stop;
 	struct node_rx_cc *cc;
 	struct ll_conn *conn;
 	memq_link_t *link;
 	uint8_t chan_sel;
+	void *node;
 
 	/* Get reference to Tx-ed CONNECT_IND PDU */
 	pdu_tx = (void *)((struct node_rx_pdu *)rx)->pdu;
@@ -763,8 +860,14 @@ void ull_central_setup(struct node_rx_hdr *rx, struct node_rx_ftr *ftr,
 	/* This is the chan sel bit from the received adv pdu */
 	chan_sel = pdu_tx->chan_sel;
 
+	/* Check for pdu field being aligned before populating connection
+	 * complete event.
+	 */
+	node = pdu_tx;
+	LL_ASSERT(IS_PTR_ALIGNED(node, struct node_rx_cc));
+
 	/* Populate the fields required for connection complete event */
-	cc = (void *)pdu_tx;
+	cc = node;
 	cc->status = 0U;
 	cc->role = 0U;
 
@@ -806,6 +909,11 @@ void ull_central_setup(struct node_rx_hdr *rx, struct node_rx_ftr *ftr,
 	conn = lll->hdr.parent;
 	lll->handle = ll_conn_handle_get(conn);
 	rx->handle = lll->handle;
+
+#if (!defined(CONFIG_BT_LL_SW_LLCP_LEGACY))
+	/* Set LLCP as connection-wise connected */
+	ull_cp_state_set(conn, ULL_CP_CONNECTED);
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
 	lll->tx_pwr_lvl = RADIO_TXP_DEFAULT;
@@ -881,10 +989,13 @@ void ull_central_setup(struct node_rx_hdr *rx, struct node_rx_ftr *ftr,
 
 	/* Stop Scanner */
 	ticker_id_scan = TICKER_ID_SCAN_BASE + ull_scan_handle_get(scan);
-	ticker_status = ticker_stop(TICKER_INSTANCE_ID_CTLR,
-				    TICKER_USER_ID_ULL_HIGH,
-				    ticker_id_scan, ticker_op_stop_scan_cb,
-				    scan);
+	ticks_at_stop = ftr->ticks_anchor +
+			HAL_TICKER_US_TO_TICKS(conn_offset_us) -
+			ticks_slot_offset;
+	ticker_status = ticker_stop_abs(TICKER_INSTANCE_ID_CTLR,
+					TICKER_USER_ID_ULL_HIGH,
+					ticker_id_scan, ticks_at_stop,
+					ticker_op_stop_scan_cb, scan);
 	LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
 		  (ticker_status == TICKER_STATUS_BUSY));
 
@@ -1042,6 +1153,7 @@ uint8_t ull_central_chm_update(void)
 			continue;
 		}
 
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 		ret = ull_conn_llcp_req(conn);
 		if (ret) {
 			return ret;
@@ -1053,6 +1165,15 @@ uint8_t ull_central_chm_update(void)
 
 		conn->llcp_type = LLCP_CHAN_MAP;
 		conn->llcp_req++;
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+		uint8_t chm[5];
+
+		ull_chan_map_get(chm);
+		ret = ull_cp_chan_map_update(conn, chm);
+		if (ret) {
+			return ret;
+		}
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 	}
 
 	return 0;

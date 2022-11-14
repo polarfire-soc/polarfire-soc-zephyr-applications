@@ -21,7 +21,7 @@ config NUM_IRQ_PRIO_LEVELS
 	default 15
 
 config NUM_IRQS
-	default 25
+	default 26
 
 # Technically ARC HS supports MPUv3, but not v2. But given MPUv3
 # is the same as v2 but with minimal region size of 32 bytes, we
@@ -32,6 +32,7 @@ config ARC_MPU_VER
 
 source "soc/arc/snps_qemu/Kconfig.defconfig.em"
 source "soc/arc/snps_qemu/Kconfig.defconfig.hs"
+source "soc/arc/snps_qemu/Kconfig.defconfig.hs5x"
 source "soc/arc/snps_qemu/Kconfig.defconfig.hs6x"
 
 endif

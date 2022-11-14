@@ -64,19 +64,56 @@ def test_interrupts():
                  for i in range(1, 4)}
 
     assert str(edt.get_node("/interrupt-parent-test/node").interrupts) == \
-        f"[<ControllerAndData, name: foo, controller: <Node /interrupt-parent-test/controller in 'test.dts', binding {filenames[3]}>, data: OrderedDict([('one', 1), ('two', 2), ('three', 3)])>, <ControllerAndData, name: bar, controller: <Node /interrupt-parent-test/controller in 'test.dts', binding {filenames[3]}>, data: OrderedDict([('one', 4), ('two', 5), ('three', 6)])>]"
+        f"[<ControllerAndData, name: foo, controller: <Node /interrupt-parent-test/controller in 'test.dts', binding {filenames[3]}>, data: {{'one': 1, 'two': 2, 'three': 3}}>, <ControllerAndData, name: bar, controller: <Node /interrupt-parent-test/controller in 'test.dts', binding {filenames[3]}>, data: {{'one': 4, 'two': 5, 'three': 6}}>]"
 
     assert str(edt.get_node("/interrupts-extended-test/node").interrupts) == \
-        f"[<ControllerAndData, controller: <Node /interrupts-extended-test/controller-0 in 'test.dts', binding {filenames[1]}>, data: OrderedDict([('one', 1)])>, <ControllerAndData, controller: <Node /interrupts-extended-test/controller-1 in 'test.dts', binding {filenames[2]}>, data: OrderedDict([('one', 2), ('two', 3)])>, <ControllerAndData, controller: <Node /interrupts-extended-test/controller-2 in 'test.dts', binding {filenames[3]}>, data: OrderedDict([('one', 4), ('two', 5), ('three', 6)])>]"
+        f"[<ControllerAndData, controller: <Node /interrupts-extended-test/controller-0 in 'test.dts', binding {filenames[1]}>, data: {{'one': 1}}>, <ControllerAndData, controller: <Node /interrupts-extended-test/controller-1 in 'test.dts', binding {filenames[2]}>, data: {{'one': 2, 'two': 3}}>, <ControllerAndData, controller: <Node /interrupts-extended-test/controller-2 in 'test.dts', binding {filenames[3]}>, data: {{'one': 4, 'two': 5, 'three': 6}}>]"
 
     assert str(edt.get_node("/interrupt-map-test/node@0").interrupts) == \
-        f"[<ControllerAndData, controller: <Node /interrupt-map-test/controller-0 in 'test.dts', binding {filenames[1]}>, data: OrderedDict([('one', 0)])>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-1 in 'test.dts', binding {filenames[2]}>, data: OrderedDict([('one', 0), ('two', 1)])>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-2 in 'test.dts', binding {filenames[3]}>, data: OrderedDict([('one', 0), ('two', 0), ('three', 2)])>]"
+        f"[<ControllerAndData, controller: <Node /interrupt-map-test/controller-0 in 'test.dts', binding {filenames[1]}>, data: {{'one': 0}}>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-1 in 'test.dts', binding {filenames[2]}>, data: {{'one': 0, 'two': 1}}>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-2 in 'test.dts', binding {filenames[3]}>, data: {{'one': 0, 'two': 0, 'three': 2}}>]"
 
     assert str(edt.get_node("/interrupt-map-test/node@1").interrupts) == \
-        f"[<ControllerAndData, controller: <Node /interrupt-map-test/controller-0 in 'test.dts', binding {filenames[1]}>, data: OrderedDict([('one', 3)])>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-1 in 'test.dts', binding {filenames[2]}>, data: OrderedDict([('one', 0), ('two', 4)])>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-2 in 'test.dts', binding {filenames[3]}>, data: OrderedDict([('one', 0), ('two', 0), ('three', 5)])>]"
+        f"[<ControllerAndData, controller: <Node /interrupt-map-test/controller-0 in 'test.dts', binding {filenames[1]}>, data: {{'one': 3}}>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-1 in 'test.dts', binding {filenames[2]}>, data: {{'one': 0, 'two': 4}}>, <ControllerAndData, controller: <Node /interrupt-map-test/controller-2 in 'test.dts', binding {filenames[3]}>, data: {{'one': 0, 'two': 0, 'three': 5}}>]"
 
     assert str(edt.get_node("/interrupt-map-bitops-test/node@70000000E").interrupts) == \
-        f"[<ControllerAndData, controller: <Node /interrupt-map-bitops-test/controller in 'test.dts', binding {filenames[2]}>, data: OrderedDict([('one', 3), ('two', 2)])>]"
+        f"[<ControllerAndData, controller: <Node /interrupt-map-bitops-test/controller in 'test.dts', binding {filenames[2]}>, data: {{'one': 3, 'two': 2}}>]"
+
+def test_ranges():
+    '''Tests for the ranges property'''
+    with from_here():
+        edt = edtlib.EDT("test.dts", ["test-bindings"])
+
+    assert str(edt.get_node("/reg-ranges/parent").ranges) == \
+        "[<Range, child-bus-cells: 0x1, child-bus-addr: 0x1, parent-bus-cells: 0x2, parent-bus-addr: 0xa0000000b, length-cells 0x1, length 0x1>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x2, parent-bus-cells: 0x2, parent-bus-addr: 0xc0000000d, length-cells 0x1, length 0x2>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x4, parent-bus-cells: 0x2, parent-bus-addr: 0xe0000000f, length-cells 0x1, length 0x1>]"
+
+    assert str(edt.get_node("/reg-nested-ranges/grandparent").ranges) == \
+        "[<Range, child-bus-cells: 0x2, child-bus-addr: 0x0, parent-bus-cells: 0x3, parent-bus-addr: 0x30000000000000000, length-cells 0x2, length 0x200000002>]"
+
+    assert str(edt.get_node("/reg-nested-ranges/grandparent/parent").ranges) == \
+        "[<Range, child-bus-cells: 0x1, child-bus-addr: 0x0, parent-bus-cells: 0x2, parent-bus-addr: 0x200000000, length-cells 0x1, length 0x2>]"
+
+    assert str(edt.get_node("/ranges-zero-cells/node").ranges) == "[]"
+
+    assert str(edt.get_node("/ranges-zero-parent-cells/node").ranges) == \
+        "[<Range, child-bus-cells: 0x1, child-bus-addr: 0xa, parent-bus-cells: 0x0, length-cells 0x0>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x1a, parent-bus-cells: 0x0, length-cells 0x0>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x2a, parent-bus-cells: 0x0, length-cells 0x0>]"
+
+    assert str(edt.get_node("/ranges-one-address-cells/node").ranges) == \
+        "[<Range, child-bus-cells: 0x1, child-bus-addr: 0xa, parent-bus-cells: 0x0, length-cells 0x1, length 0xb>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x1a, parent-bus-cells: 0x0, length-cells 0x1, length 0x1b>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x2a, parent-bus-cells: 0x0, length-cells 0x1, length 0x2b>]"
+
+    assert str(edt.get_node("/ranges-one-address-two-size-cells/node").ranges) == \
+        "[<Range, child-bus-cells: 0x1, child-bus-addr: 0xa, parent-bus-cells: 0x0, length-cells 0x2, length 0xb0000000c>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x1a, parent-bus-cells: 0x0, length-cells 0x2, length 0x1b0000001c>, <Range, child-bus-cells: 0x1, child-bus-addr: 0x2a, parent-bus-cells: 0x0, length-cells 0x2, length 0x2b0000002c>]"
+
+    assert str(edt.get_node("/ranges-two-address-cells/node@1").ranges) == \
+        "[<Range, child-bus-cells: 0x2, child-bus-addr: 0xa0000000b, parent-bus-cells: 0x1, parent-bus-addr: 0xc, length-cells 0x1, length 0xd>, <Range, child-bus-cells: 0x2, child-bus-addr: 0x1a0000001b, parent-bus-cells: 0x1, parent-bus-addr: 0x1c, length-cells 0x1, length 0x1d>, <Range, child-bus-cells: 0x2, child-bus-addr: 0x2a0000002b, parent-bus-cells: 0x1, parent-bus-addr: 0x2c, length-cells 0x1, length 0x2d>]"
+
+    assert str(edt.get_node("/ranges-two-address-two-size-cells/node@1").ranges) == \
+        "[<Range, child-bus-cells: 0x2, child-bus-addr: 0xa0000000b, parent-bus-cells: 0x1, parent-bus-addr: 0xc, length-cells 0x2, length 0xd0000000e>, <Range, child-bus-cells: 0x2, child-bus-addr: 0x1a0000001b, parent-bus-cells: 0x1, parent-bus-addr: 0x1c, length-cells 0x2, length 0x1d0000001e>, <Range, child-bus-cells: 0x2, child-bus-addr: 0x2a0000002b, parent-bus-cells: 0x1, parent-bus-addr: 0x2c, length-cells 0x2, length 0x2d0000001d>]"
+
+    assert str(edt.get_node("/ranges-three-address-cells/node@1").ranges) == \
+        "[<Range, child-bus-cells: 0x3, child-bus-addr: 0xa0000000b0000000c, parent-bus-cells: 0x2, parent-bus-addr: 0xd0000000e, length-cells 0x1, length 0xf>, <Range, child-bus-cells: 0x3, child-bus-addr: 0x1a0000001b0000001c, parent-bus-cells: 0x2, parent-bus-addr: 0x1d0000001e, length-cells 0x1, length 0x1f>, <Range, child-bus-cells: 0x3, child-bus-addr: 0x2a0000002b0000002c, parent-bus-cells: 0x2, parent-bus-addr: 0x2d0000002e, length-cells 0x1, length 0x2f>]"
+
+    assert str(edt.get_node("/ranges-three-address-two-size-cells/node@1").ranges) == \
+        "[<Range, child-bus-cells: 0x3, child-bus-addr: 0xa0000000b0000000c, parent-bus-cells: 0x2, parent-bus-addr: 0xd0000000e, length-cells 0x2, length 0xf00000010>, <Range, child-bus-cells: 0x3, child-bus-addr: 0x1a0000001b0000001c, parent-bus-cells: 0x2, parent-bus-addr: 0x1d0000001e, length-cells 0x2, length 0x1f00000110>, <Range, child-bus-cells: 0x3, child-bus-addr: 0x2a0000002b0000002c, parent-bus-cells: 0x2, parent-bus-addr: 0x2d0000002e, length-cells 0x2, length 0x2f00000210>]"
 
 def test_reg():
     '''Tests for the regs property'''
@@ -117,9 +154,23 @@ def test_hierarchy():
         "<Node /parent/child-2 in 'test.dts', no binding>"
 
     assert str(edt.get_node("/parent").children) == \
-        "OrderedDict([('child-1', <Node /parent/child-1 in 'test.dts', no binding>), ('child-2', <Node /parent/child-2 in 'test.dts', no binding>)])"
+        "{'child-1': <Node /parent/child-1 in 'test.dts', no binding>, 'child-2': <Node /parent/child-2 in 'test.dts', no binding>}"
 
     assert edt.get_node("/parent/child-1").children == {}
+
+def test_child_index():
+    '''Test Node.child_index.'''
+    with from_here():
+        edt = edtlib.EDT("test.dts", ["test-bindings"])
+
+    parent, child_1, child_2 = [edt.get_node(path) for path in
+                                ("/parent",
+                                 "/parent/child-1",
+                                 "/parent/child-2")]
+    assert parent.child_index(child_1) == 0
+    assert parent.child_index(child_2) == 1
+    with pytest.raises(KeyError):
+        parent.child_index(parent)
 
 def test_include():
     '''Test 'include:' and the legacy 'inherits: !include ...' in bindings'''
@@ -129,8 +180,14 @@ def test_include():
     assert str(edt.get_node("/binding-include").description) == \
         "Parent binding"
 
-    assert str(edt.get_node("/binding-include").props) == \
-        "OrderedDict([('foo', <Property, name: foo, type: int, value: 0>), ('bar', <Property, name: bar, type: int, value: 1>), ('baz', <Property, name: baz, type: int, value: 2>), ('qaz', <Property, name: qaz, type: int, value: 3>)])"
+    assert str(edt.get_node("/binding-include").props) == (
+        "{"
+        "'foo': <Property, name: foo, type: int, value: 0>, "
+        "'bar': <Property, name: bar, type: int, value: 1>, "
+        "'baz': <Property, name: baz, type: int, value: 2>, "
+        "'qaz': <Property, name: qaz, type: int, value: 3>"
+        "}"
+    )
 
 def test_include_filters():
     '''Test property-allowlist and property-blocklist in an include.'''
@@ -222,28 +279,36 @@ def test_bus():
     with from_here():
         edt = edtlib.EDT("test.dts", ["test-bindings"])
 
-    assert edt.get_node("/buses/foo-bus").bus == "foo"
+    assert isinstance(edt.get_node("/buses/foo-bus").buses, list)
+    assert "foo" in edt.get_node("/buses/foo-bus").buses
 
     # foo-bus does not itself appear on a bus
-    assert edt.get_node("/buses/foo-bus").on_bus is None
+    assert isinstance(edt.get_node("/buses/foo-bus").on_buses, list)
+    assert not edt.get_node("/buses/foo-bus").on_buses
     assert edt.get_node("/buses/foo-bus").bus_node is None
 
     # foo-bus/node1 is not a bus node...
-    assert edt.get_node("/buses/foo-bus/node1").bus is None
+    assert isinstance(edt.get_node("/buses/foo-bus/node1").buses, list)
+    assert not edt.get_node("/buses/foo-bus/node1").buses
     # ...but is on a bus
-    assert edt.get_node("/buses/foo-bus/node1").on_bus == "foo"
+    assert isinstance(edt.get_node("/buses/foo-bus/node1").on_buses, list)
+    assert "foo" in edt.get_node("/buses/foo-bus/node1").on_buses
     assert edt.get_node("/buses/foo-bus/node1").bus_node.path == \
         "/buses/foo-bus"
 
     # foo-bus/node2 is not a bus node...
-    assert edt.get_node("/buses/foo-bus/node2").bus is None
+    assert isinstance(edt.get_node("/buses/foo-bus/node2").buses, list)
+    assert not edt.get_node("/buses/foo-bus/node2").buses
     # ...but is on a bus
-    assert edt.get_node("/buses/foo-bus/node2").on_bus == "foo"
+    assert isinstance(edt.get_node("/buses/foo-bus/node2").on_buses, list)
+    assert "foo" in edt.get_node("/buses/foo-bus/node2").on_buses
 
     # no-bus-node is not a bus node...
-    assert edt.get_node("/buses/no-bus-node").bus is None
+    assert isinstance(edt.get_node("/buses/no-bus-node").buses, list)
+    assert not edt.get_node("/buses/no-bus-node").buses
     # ... and is not on a bus
-    assert edt.get_node("/buses/no-bus-node").on_bus is None
+    assert isinstance(edt.get_node("/buses/no-bus-node").on_buses, list)
+    assert not edt.get_node("/buses/no-bus-node").on_buses
 
     # Same compatible string, but different bindings from being on different
     # buses
@@ -257,7 +322,8 @@ def test_bus():
         hpath("test-bindings/device-on-any-bus.yaml")
 
     # foo-bus/node/nested also appears on the foo-bus bus
-    assert edt.get_node("/buses/foo-bus/node1/nested").on_bus == "foo"
+    assert isinstance(edt.get_node("/buses/foo-bus/node1/nested").on_buses, list)
+    assert "foo" in edt.get_node("/buses/foo-bus/node1/nested").on_buses
     assert str(edt.get_node("/buses/foo-bus/node1/nested").binding_path) == \
         hpath("test-bindings/device-on-foo-bus.yaml")
 
@@ -271,15 +337,15 @@ def test_child_binding():
 
     assert str(child1.binding_path) == hpath("test-bindings/child-binding.yaml")
     assert str(child1.description) == "child node"
-    assert str(child1.props) == "OrderedDict([('child-prop', <Property, name: child-prop, type: int, value: 1>)])"
+    assert str(child1.props) == "{'child-prop': <Property, name: child-prop, type: int, value: 1>}"
 
     assert str(child2.binding_path) == hpath("test-bindings/child-binding.yaml")
     assert str(child2.description) == "child node"
-    assert str(child2.props) == "OrderedDict([('child-prop', <Property, name: child-prop, type: int, value: 3>)])"
+    assert str(child2.props) == "{'child-prop': <Property, name: child-prop, type: int, value: 3>}"
 
     assert str(grandchild.binding_path) == hpath("test-bindings/child-binding.yaml")
     assert str(grandchild.description) == "grandchild node"
-    assert str(grandchild.props) == "OrderedDict([('grandchild-prop', <Property, name: grandchild-prop, type: int, value: 2>)])"
+    assert str(grandchild.props) == "{'grandchild-prop': <Property, name: grandchild-prop, type: int, value: 2>}"
 
     with from_here():
         binding_file = Path("test-bindings/child-binding.yaml").resolve()
@@ -334,16 +400,16 @@ def test_props():
         f"<Property, name: phandle-refs, type: phandles, value: [<Node /ctrl-1 in 'test.dts', binding {filenames[1]}>, <Node /ctrl-2 in 'test.dts', binding {filenames[2]}>]>"
 
     assert str(edt.get_node("/props").props["phandle-array-foos"]) == \
-        f"<Property, name: phandle-array-foos, type: phandle-array, value: [<ControllerAndData, controller: <Node /ctrl-1 in 'test.dts', binding {filenames[1]}>, data: OrderedDict([('one', 1)])>, <ControllerAndData, controller: <Node /ctrl-2 in 'test.dts', binding {filenames[2]}>, data: OrderedDict([('one', 2), ('two', 3)])>]>"
+        f"<Property, name: phandle-array-foos, type: phandle-array, value: [<ControllerAndData, controller: <Node /ctrl-1 in 'test.dts', binding {filenames[1]}>, data: {{'one': 1}}>, <ControllerAndData, controller: <Node /ctrl-2 in 'test.dts', binding {filenames[2]}>, data: {{'one': 2, 'two': 3}}>]>"
 
     assert str(edt.get_node("/props-2").props["phandle-array-foos"]) == \
         ("<Property, name: phandle-array-foos, type: phandle-array, value: ["
-         f"<ControllerAndData, name: a, controller: <Node /ctrl-0-1 in 'test.dts', binding {filenames[0]}>, data: OrderedDict()>, "
+         f"<ControllerAndData, name: a, controller: <Node /ctrl-0-1 in 'test.dts', binding {filenames[0]}>, data: {{}}>, "
          "None, "
-         f"<ControllerAndData, name: b, controller: <Node /ctrl-0-2 in 'test.dts', binding {filenames[0]}>, data: OrderedDict()>]>")
+         f"<ControllerAndData, name: b, controller: <Node /ctrl-0-2 in 'test.dts', binding {filenames[0]}>, data: {{}}>]>")
 
     assert str(edt.get_node("/props").props["foo-gpios"]) == \
-        f"<Property, name: foo-gpios, type: phandle-array, value: [<ControllerAndData, controller: <Node /ctrl-1 in 'test.dts', binding {filenames[1]}>, data: OrderedDict([('gpio-one', 1)])>]>"
+        f"<Property, name: foo-gpios, type: phandle-array, value: [<ControllerAndData, controller: <Node /ctrl-1 in 'test.dts', binding {filenames[1]}>, data: {{'gpio-one': 1}}>]>"
 
     assert str(edt.get_node("/props").props["path"]) == \
         f"<Property, name: path, type: path, value: <Node /ctrl-1 in 'test.dts', binding {filenames[1]}>>"
@@ -355,7 +421,7 @@ def test_nexus():
     filename = hpath('test-bindings/gpio-dst.yaml')
 
     assert str(edt.get_node("/gpio-map/source").props["foo-gpios"]) == \
-        f"<Property, name: foo-gpios, type: phandle-array, value: [<ControllerAndData, controller: <Node /gpio-map/destination in 'test.dts', binding {filename}>, data: OrderedDict([('val', 6)])>, <ControllerAndData, controller: <Node /gpio-map/destination in 'test.dts', binding {filename}>, data: OrderedDict([('val', 5)])>]>"
+        f"<Property, name: foo-gpios, type: phandle-array, value: [<ControllerAndData, controller: <Node /gpio-map/destination in 'test.dts', binding {filename}>, data: {{'val': 6}}>, <ControllerAndData, controller: <Node /gpio-map/destination in 'test.dts', binding {filename}>, data: {{'val': 5}}>]>"
 
     assert str(edt.get_node("/gpio-map/source").props["foo-gpios"].val[0].basename) == f"gpio"
 
@@ -365,7 +431,7 @@ def test_prop_defaults():
         edt = edtlib.EDT("test.dts", ["test-bindings"])
 
     assert str(edt.get_node("/defaults").props) == \
-        r"OrderedDict([('int', <Property, name: int, type: int, value: 123>), ('array', <Property, name: array, type: array, value: [1, 2, 3]>), ('uint8-array', <Property, name: uint8-array, type: uint8-array, value: b'\x89\xab\xcd'>), ('string', <Property, name: string, type: string, value: 'hello'>), ('string-array', <Property, name: string-array, type: string-array, value: ['hello', 'there']>), ('default-not-used', <Property, name: default-not-used, type: int, value: 234>)])"
+        r"{'int': <Property, name: int, type: int, value: 123>, 'array': <Property, name: array, type: array, value: [1, 2, 3]>, 'uint8-array': <Property, name: uint8-array, type: uint8-array, value: b'\x89\xab\xcd'>, 'string': <Property, name: string, type: string, value: 'hello'>, 'string-array': <Property, name: string-array, type: string-array, value: ['hello', 'there']>, 'default-not-used': <Property, name: default-not-used, type: int, value: 234>}"
 
 def test_prop_enums():
     '''test properties with enum: in the binding'''
@@ -411,7 +477,7 @@ def test_binding_inference():
     with from_here():
         edt = edtlib.EDT("test.dts", ["test-bindings"], warnings)
 
-    assert str(edt.get_node("/zephyr,user").props) == r"OrderedDict()"
+    assert str(edt.get_node("/zephyr,user").props) == '{}'
 
     with from_here():
         edt = edtlib.EDT("test.dts", ["test-bindings"], warnings,
@@ -419,8 +485,19 @@ def test_binding_inference():
     filenames = {i: hpath(f'test-bindings/phandle-array-controller-{i}.yaml')
                  for i in range(1, 3)}
 
-    assert str(edt.get_node("/zephyr,user").props) == \
-        rf"OrderedDict([('boolean', <Property, name: boolean, type: boolean, value: True>), ('bytes', <Property, name: bytes, type: uint8-array, value: b'\x81\x82\x83'>), ('number', <Property, name: number, type: int, value: 23>), ('numbers', <Property, name: numbers, type: array, value: [1, 2, 3]>), ('string', <Property, name: string, type: string, value: 'text'>), ('strings', <Property, name: strings, type: string-array, value: ['a', 'b', 'c']>), ('handle', <Property, name: handle, type: phandle, value: <Node /ctrl-1 in 'test.dts', binding {filenames[1]}>>), ('phandles', <Property, name: phandles, type: phandles, value: [<Node /ctrl-1 in 'test.dts', binding {filenames[1]}>, <Node /ctrl-2 in 'test.dts', binding {filenames[2]}>]>), ('phandle-array-foos', <Property, name: phandle-array-foos, type: phandle-array, value: [<ControllerAndData, controller: <Node /ctrl-2 in 'test.dts', binding {filenames[2]}>, data: OrderedDict([('one', 1), ('two', 2)])>]>)])"
+    assert str(edt.get_node("/zephyr,user").props) == (
+        "{"
+        "'boolean': <Property, name: boolean, type: boolean, value: True>, "
+        r"'bytes': <Property, name: bytes, type: uint8-array, value: b'\x81\x82\x83'>, "
+        "'number': <Property, name: number, type: int, value: 23>, "
+        "'numbers': <Property, name: numbers, type: array, value: [1, 2, 3]>, "
+        "'string': <Property, name: string, type: string, value: 'text'>, "
+        "'strings': <Property, name: strings, type: string-array, value: ['a', 'b', 'c']>, "
+        f"'handle': <Property, name: handle, type: phandle, value: <Node /ctrl-1 in 'test.dts', binding {filenames[1]}>>, "
+        f"'phandles': <Property, name: phandles, type: phandles, value: [<Node /ctrl-1 in 'test.dts', binding {filenames[1]}>, <Node /ctrl-2 in 'test.dts', binding {filenames[2]}>]>, "
+        f"'phandle-array-foos': <Property, name: phandle-array-foos, type: phandle-array, value: [<ControllerAndData, controller: <Node /ctrl-2 in 'test.dts', binding {filenames[2]}>, data: {{'one': 1, 'two': 2}}>]>"
+        "}"
+    )
 
 def test_multi_bindings():
     '''Test having multiple directories with bindings'''

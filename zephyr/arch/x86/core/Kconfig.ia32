@@ -6,7 +6,7 @@
 if !X86_64
 
 config NESTED_INTERRUPTS
-	bool "Enable nested interrupts"
+	bool "Nested interrupts"
 	default y
 	help
 	  This option enables support for nested interrupts.
@@ -137,8 +137,7 @@ endif # CPU_HAS_FPU
 
 config X86_FP_USE_SOFT_FLOAT
 	bool
-	prompt "Use Software Floating Point Operations" if !(NEWLIB_LIBC && !FPU)
-	default y if NEWLIB_LIBC && !FPU
+	default y if !FPU
 	help
 	  Enable using software floating point operations.
 

@@ -33,7 +33,7 @@ config SETTINGS_ENCODE_LEN
 	depends on SETTINGS
 	bool
 
-choice
+choice SETTINGS_BACKEND
 	prompt "Storage back-end"
 	default SETTINGS_NVS if NVS
 	default SETTINGS_FCB if FCB
@@ -62,6 +62,24 @@ config SETTINGS_NVS
 	depends on FLASH_MAP
 	help
 	  Enables NVS storage support
+
+if SETTINGS_NVS
+
+config SETTINGS_NVS_NAME_CACHE
+	bool "NVS name lookup cache"
+	help
+	  Enable NVS name lookup cache, used to reduce the Settings name
+	  lookup time.
+
+config SETTINGS_NVS_NAME_CACHE_SIZE
+	int "NVS name lookup cache size"
+	default 128
+	range 1 65535
+	depends on SETTINGS_NVS_NAME_CACHE
+	help
+	  Number of entries in Settings NVS name cache.
+
+endif # SETTINGS_NVS
 
 config SETTINGS_CUSTOM
 	bool "CUSTOM"
@@ -124,3 +142,12 @@ config SETTINGS_NVS_SECTOR_COUNT
 	depends on SETTINGS && SETTINGS_NVS
 	help
 	  Number of sectors used for the NVS settings area
+
+config SETTINGS_SHELL
+	bool "Settings shell"
+	depends on SETTINGS && SHELL
+	help
+	  Enable shell commands for listing and reading the settings. Note that
+	  reading the settings requires quite a big stack buffer, so the stack
+	  size of the shell thread may need to be increased to accommodate this
+	  feature.

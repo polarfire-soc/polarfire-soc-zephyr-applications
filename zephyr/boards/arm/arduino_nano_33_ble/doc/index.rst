@@ -11,8 +11,7 @@ nRF52840 ARM Cortex-M4F CPU. Arduino sells 2 variants of the board, the
 plain `BLE`_ type and the `BLE Sense`_ type. The "Sense" variant is distinguished by
 the inclusion of more sensors, but otherwise both variants are the same.
 
-.. image:: img/arduino_nano_33_ble_sense.png
-     :width: 500px
+.. image:: img/arduino_nano_33_ble_sense.jpg
      :align: center
      :alt: Arduino Nano 33 BLE (Sense variant)
 
@@ -61,7 +60,7 @@ The package is configured to support the following hardware:
 | WDT       | on-chip    | watchdog             |
 +-----------+------------+----------------------+
 
-Other hardware features are not supported by the Zephyr kernel.
+Other hardware features have not been enabled yet for this board.
 
 Notably, this includes the PDM (microphone) interface.
 
@@ -71,17 +70,9 @@ Connections and IOs
 The `schematic`_ will tell you everything
 you need to know about the pins.
 
-A convinience header mapping the Arduino pin names to their
-Zephyr pin numbers can be found in :code:`arduino_nano_33_ble_pins.h`,
-if you link against the :code:`arduino_nano_33_ble_pins` CMake library.
-
-For your convience, two Kconfig options are added:
-
-#. :code:`BOARD_ARDUINO_NANO_33_BLE_INIT_SENSORS`:
-    This configuration option enables the internal I2C sensors.
-#. :code:`BOARD_ARDUINO_NANO_33_BLE_EN_USB_CONSOLE`:
-    This configuration option enables the USB CDC subsystem and
-    the console, so that printk works.
+The I2C pull-ups are enabled by setting pin P1.00 high. This is automatically
+done at system init. The pin is specified in the ``zephyr,user`` Devicetree node
+as ``pull-up-gpios``.
 
 Programming and Debugging
 *************************
@@ -136,10 +127,10 @@ References
 .. target-notes::
 
 .. _BLE:
-    https://store.arduino.cc/usa/nano-33-ble/
+    https://store.arduino.cc/products/arduino-nano-33-ble
 
 .. _BLE SENSE:
-    https://store.arduino.cc/usa/nano-33-ble-sense/
+    https://store.arduino.cc/products/arduino-nano-33-ble-sense
 
 .. _pinouts:
     https://learn.adafruit.com/introducing-the-adafruit-nrf52840-feather/pinouts

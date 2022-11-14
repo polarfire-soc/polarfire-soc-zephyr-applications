@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <sys/byteorder.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/bluetooth/bluetooth.h>
 
 #include "util/mem.h"
 #include "util/memq.h"
@@ -17,6 +18,14 @@
 #include "pdu.h"
 #include "lll.h"
 #include "lll_conn.h"
+
+#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
+#include "ull_tx_queue.h"
+#endif
+
+#include "isoal.h"
+#include "ull_iso_types.h"
+#include "ull_iso_internal.h"
 #include "ull_conn_types.h"
 #include "lll_conn_iso.h"
 #include "ull_conn_iso_types.h"
@@ -25,12 +34,23 @@
 #include "ull_internal.h"
 #include "lll/lll_vendor.h"
 
+#include "ll.h"
+
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
 #define LOG_MODULE_NAME bt_ctlr_ull_conn_iso
 #include "common/log.h"
 #include "hal/debug.h"
 
-#define LAST_VALID_CIS_HANDLE (CONFIG_BT_CTLR_CONN_ISO_STREAMS + LL_CIS_HANDLE_BASE - 1)
+/* Used by LISTIFY */
+#define _INIT_MAYFLY_ARRAY(_i, _l, _fp) \
+	{ ._link = &_l[_i], .fp = _fp },
+
+/* Declare static initialized array of mayflies with associated link element */
+#define DECLARE_MAYFLY_ARRAY(_name, _fp, _cnt) \
+	static memq_link_t _links[_cnt]; \
+	static struct mayfly _name[_cnt] = \
+		{ LISTIFY(_cnt, _INIT_MAYFLY_ARRAY, (), _links, _fp) }
+
 
 static int init_reset(void);
 static void ticker_update_cig_op_cb(uint32_t status, void *param);
@@ -42,6 +62,8 @@ static void cis_disabled_cb(void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
 static void cig_disable(void *param);
 static void cig_disabled_cb(void *param);
+static void disable(uint16_t handle);
+static void cis_tx_lll_flush(void *param);
 
 static struct ll_conn_iso_stream cis_pool[CONFIG_BT_CTLR_CONN_ISO_STREAMS];
 static void *cis_free;
@@ -85,12 +107,21 @@ struct ll_conn_iso_group *ll_conn_iso_group_get_by_id(uint8_t id)
 
 struct ll_conn_iso_stream *ll_conn_iso_stream_acquire(void)
 {
-	return mem_acquire(&cis_free);
+	struct ll_conn_iso_stream *cis = mem_acquire(&cis_free);
+
+	if (cis) {
+		(void)memset(&cis->hdr, 0U, sizeof(cis->hdr));
+	}
+
+	return cis;
 }
 
 void ll_conn_iso_stream_release(struct ll_conn_iso_stream *cis)
 {
-	mem_release(cis, &cig_free);
+	cis->cis_id = 0;
+	cis->group = NULL;
+
+	mem_release(cis, &cis_free);
 }
 
 uint16_t ll_conn_iso_stream_handle_get(struct ll_conn_iso_stream *cis)
@@ -116,7 +147,8 @@ struct ll_conn_iso_stream *ll_iso_stream_connected_get(uint16_t handle)
 	}
 
 	cis = ll_conn_iso_stream_get(handle);
-	if (cis->lll.handle != handle) {
+	if ((cis->group == NULL) || (cis->lll.handle != handle)) {
+		/* CIS does not belong to a group or has inconsistent handle */
 		return NULL;
 	}
 
@@ -193,6 +225,7 @@ struct ll_conn_iso_stream *ll_conn_iso_stream_get_by_group(struct ll_conn_iso_gr
 
 void ull_conn_iso_cis_established(struct ll_conn_iso_stream *cis)
 {
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 	struct node_rx_conn_iso_estab *est;
 	struct node_rx_pdu *node_rx;
 
@@ -209,10 +242,11 @@ void ull_conn_iso_cis_established(struct ll_conn_iso_stream *cis)
 
 	est = (void *)node_rx->pdu;
 	est->status = 0;
-	est->cis_handle = sys_le16_to_cpu(cis->lll.handle);
+	est->cis_handle = cis->lll.handle;
 
 	ll_rx_put(node_rx->hdr.link, node_rx);
 	ll_rx_sched();
+#endif /* defined(CONFIG_BT_LL_SW_LLCP_LEGACY) */
 
 	cis->established = 1;
 }
@@ -271,12 +305,14 @@ void ull_conn_iso_done(struct node_rx_event_done *done)
  * has completed and the stream is released and callback is provided, the
  * cis_released_cb callback is invoked.
  *
- * @param cis		 Pointer to connected ISO stream to stop
- * @param cis_relased_cb Callback to invoke when the CIS has been released.
- *                       NULL to ignore.
+ * @param cis             Pointer to connected ISO stream to stop
+ * @param cis_released_cb Callback to invoke when the CIS has been released.
+ *                        NULL to ignore.
+ * @param reason          Termination reason
  */
 void ull_conn_iso_cis_stop(struct ll_conn_iso_stream *cis,
-			   ll_iso_stream_released_cb_t cis_released_cb)
+			   ll_iso_stream_released_cb_t cis_released_cb,
+			   uint8_t reason)
 {
 	struct ll_conn_iso_group *cig;
 	struct ull_hdr *hdr;
@@ -287,6 +323,7 @@ void ull_conn_iso_cis_stop(struct ll_conn_iso_stream *cis,
 	}
 	cis->teardown = 1;
 	cis->released_cb = cis_released_cb;
+	cis->terminate_reason = reason;
 
 	/* Check ref count to determine if any pending LLL events in pipeline */
 	cig = cis->group;
@@ -341,6 +378,11 @@ void ull_conn_iso_resume_ticker_start(struct lll_event *resume_event,
 	cig = resume_event->prepare_param.param;
 	ticker_id = TICKER_ID_CONN_ISO_RESUME_BASE + cig->handle;
 
+	if (cig->resume_cis != LLL_HANDLE_INVALID) {
+		/* Restarting resume ticker - must be stopped first */
+		(void)ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_LLL,
+				  ticker_id, NULL, NULL);
+	}
 	cig->resume_cis = cis_handle;
 
 	if (0) {
@@ -396,7 +438,15 @@ int ull_conn_iso_reset(void)
 
 static int init_reset(void)
 {
+	struct ll_conn_iso_stream *cis;
+	struct ll_conn_iso_group *cig;
+	uint16_t handle;
 	int err;
+
+	/* Disable all active CIGs (uses blocking ull_ticker_stop_with_mark) */
+	for (handle = 0U; handle < CONFIG_BT_CTLR_CONN_ISO_GROUPS; handle++) {
+		disable(handle);
+	}
 
 	/* Initialize CIS pool */
 	mem_init(cis_pool, sizeof(struct ll_conn_iso_stream),
@@ -408,8 +458,17 @@ static int init_reset(void)
 		 sizeof(cig_pool) / sizeof(struct ll_conn_iso_group),
 		 &cig_free);
 
-	for (int h = 0; h < CONFIG_BT_CTLR_CONN_ISO_GROUPS; h++) {
-		ll_conn_iso_group_get(h)->cig_id = 0xFF;
+	for (handle = 0; handle < CONFIG_BT_CTLR_CONN_ISO_GROUPS; handle++) {
+		cig = ll_conn_iso_group_get(handle);
+		cig->cig_id  = 0xFF;
+		cig->started = 0;
+		cig->lll.num_cis = 0;
+	}
+
+	for (handle = LL_CIS_HANDLE_BASE; handle <= LAST_VALID_CIS_HANDLE; handle++) {
+		cis = ll_conn_iso_stream_get(handle);
+		cis->cis_id = 0;
+		cis->group  = NULL;
 	}
 
 	/* Initialize LLL */
@@ -445,6 +504,7 @@ static void ticker_resume_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, lll_resume};
+	struct lll_conn_iso_group *cig;
 	struct lll_event *resume_event;
 	uint32_t ret;
 
@@ -459,6 +519,10 @@ static void ticker_resume_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 	resume_event->prepare_param.lazy = 0;
 	resume_event->prepare_param.force = force;
 	mfy.param = resume_event;
+
+	/* Mark resume as done */
+	cig = resume_event->prepare_param.param;
+	cig->resume_cis = LLL_HANDLE_INVALID;
 
 	/* Kick LLL resume */
 	ret = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH, TICKER_USER_ID_LLL,
@@ -485,23 +549,74 @@ static void cis_disabled_cb(void *param)
 		cis = ll_conn_iso_stream_get_by_group(cig, &handle_iter);
 		LL_ASSERT(cis);
 
-		if (cis->teardown) {
-			struct ll_conn *conn;
+		if (cis->lll.flushed) {
 			ll_iso_stream_released_cb_t cis_released_cb;
+			struct ll_conn *conn;
 
 			conn = ll_conn_get(cis->lll.acl_handle);
 			cis_released_cb = cis->released_cb;
 
+			/* Remove data path and ISOAL sink/source associated with this CIS
+			 * for both directions.
+			 */
+			ll_remove_iso_path(cis->lll.handle, BT_HCI_DATAPATH_DIR_CTLR_TO_HOST);
+			ll_remove_iso_path(cis->lll.handle, BT_HCI_DATAPATH_DIR_HOST_TO_CTLR);
+
 			ll_conn_iso_stream_release(cis);
 			cig->lll.num_cis--;
 
-			/* Check if removed CIS had an ACL disassociation callback. Invoke
+#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
+			/* CIS terminated, triggers completion of CIS_TERMINATE_IND procedure */
+			/* Only used by local procedure, ignored for remote procedure */
+			conn->llcp.cis.terminate_ack = 1U;
+#endif /* defined(CONFIG_BT_LL_SW_LLCP_LEGACY) */
+
+			/* Check if removed CIS has an ACL disassociation callback. Invoke
 			 * the callback to allow cleanup.
 			 */
 			if (cis_released_cb) {
 				/* CIS removed - notify caller */
 				cis_released_cb(conn);
 			}
+		} else if (cis->teardown) {
+			DECLARE_MAYFLY_ARRAY(mfys, cis_tx_lll_flush,
+				CONFIG_BT_CTLR_CONN_ISO_GROUPS);
+			struct node_rx_pdu *node_terminate;
+			uint32_t ret;
+
+			/* Create and enqueue termination node. This shall prevent
+			 * further enqueuing of TX nodes for terminating CIS.
+			 */
+			node_terminate = ull_pdu_rx_alloc();
+			LL_ASSERT(node_terminate);
+			node_terminate->hdr.handle = cis->lll.handle;
+			node_terminate->hdr.type = NODE_RX_TYPE_TERMINATE;
+			*((uint8_t *)node_terminate->pdu) = cis->terminate_reason;
+
+			ll_rx_put(node_terminate->hdr.link, node_terminate);
+			ll_rx_sched();
+
+			if (cig->lll.resume_cis == cis->lll.handle) {
+				/* Resume pending for terminating CIS - stop ticker */
+				(void)ticker_stop(TICKER_INSTANCE_ID_CTLR,
+						  TICKER_USER_ID_ULL_HIGH,
+						  TICKER_ID_CONN_ISO_RESUME_BASE +
+						  ll_conn_iso_group_handle_get(cig),
+						  NULL, NULL);
+
+				cig->lll.resume_cis = LLL_HANDLE_INVALID;
+			}
+
+			/* We need to flush TX nodes in LLL before releasing the stream.
+			 * More than one CIG may be terminating at the same time, so
+			 * enqueue a mayfly instance for this CIG.
+			 */
+			mfys[cig->lll.handle].param = &cis->lll;
+			ret = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH,
+					     TICKER_USER_ID_LLL, 1, &mfys[cig->lll.handle]);
+			LL_ASSERT(!ret);
+
+			return;
 		}
 	}
 
@@ -519,6 +634,44 @@ static void cis_disabled_cb(void *param)
 		LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
 			  (ticker_status == TICKER_STATUS_BUSY));
 	}
+}
+
+static void cis_tx_lll_flush(void *param)
+{
+	DECLARE_MAYFLY_ARRAY(mfys, cis_disabled_cb, CONFIG_BT_CTLR_CONN_ISO_GROUPS);
+
+	struct lll_conn_iso_stream *lll;
+	struct ll_conn_iso_stream *cis;
+	struct ll_conn_iso_group *cig;
+	struct node_tx *tx;
+	memq_link_t *link;
+	uint32_t ret;
+
+	lll = param;
+	lll->flushed = 1;
+
+	cis = ll_conn_iso_stream_get(lll->handle);
+	cig = cis->group;
+
+	/* Flush in LLL - may return TX nodes to ack queue */
+	lll_conn_iso_flush(lll->handle, lll);
+
+	link = memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head, (void **)&tx);
+	while (link) {
+		/* Create instant NACK */
+		ll_tx_ack_put(lll->handle, tx);
+		link->next = tx->next;
+		tx->next = link;
+
+		link = memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head,
+				    (void **)&tx);
+	}
+
+	/* Resume CIS teardown in ULL_HIGH context */
+	mfys[cig->lll.handle].param = &cig->lll;
+	ret = mayfly_enqueue(TICKER_USER_ID_LLL,
+			     TICKER_USER_ID_ULL_HIGH, 1, &mfys[cig->lll.handle]);
+	LL_ASSERT(!ret);
 }
 
 static void ticker_stop_op_cb(uint32_t status, void *param)
@@ -574,8 +727,86 @@ static void cig_disabled_cb(void *param)
 	struct ll_conn_iso_group *cig;
 
 	cig = HDR_LLL2ULL(param);
+	cig->cig_id  = 0xFF;
+	cig->started = 0;
 
 	ll_conn_iso_group_release(cig);
+}
 
-	/* TODO: Flush pending TX in LLL */
+static void disable(uint16_t handle)
+{
+	struct ll_conn_iso_group *cig;
+	int err;
+
+	cig = ll_conn_iso_group_get(handle);
+
+	(void)ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_THREAD,
+			  TICKER_ID_CONN_ISO_RESUME_BASE + handle, NULL,
+			  NULL);
+
+	err = ull_ticker_stop_with_mark(TICKER_ID_CONN_ISO_BASE + handle,
+					cig, &cig->lll);
+
+	LL_ASSERT(err == 0 || err == -EALREADY);
+
+	cig->lll.handle = LLL_HANDLE_INVALID;
+	cig->lll.resume_cis = LLL_HANDLE_INVALID;
+}
+
+/* An ISO interval has elapsed for a Connected Isochronous Group */
+void ull_conn_iso_transmit_test_cig_interval(uint16_t handle, uint32_t ticks_at_expire)
+{
+	struct ll_conn_iso_stream *cis;
+	struct ll_conn_iso_group *cig;
+	uint32_t sdu_interval;
+	uint32_t iso_interval;
+	uint16_t handle_iter;
+	uint64_t sdu_counter;
+	uint8_t tx_sdu_count;
+
+	cig = ll_conn_iso_group_get(handle);
+	LL_ASSERT(cig);
+
+	handle_iter = UINT16_MAX;
+
+	if (cig->lll.role) {
+		/* Peripheral */
+		sdu_interval = cig->p_sdu_interval;
+	} else {
+		/* Central */
+		sdu_interval = cig->c_sdu_interval;
+	}
+
+	iso_interval = cig->iso_interval * PERIODIC_INT_UNIT_US;
+
+	/* Handle ISO Transmit Test for all active CISes in the group */
+	for (uint8_t i = 0; i < cig->lll.num_cis; i++)  {
+		cis = ll_conn_iso_stream_get_by_group(cig, &handle_iter);
+		LL_ASSERT(cis);
+
+		if (!cis->hdr.test_mode.tx_enabled || cis->lll.handle == LLL_HANDLE_INVALID) {
+			continue;
+		}
+
+		/* Calculate number of SDUs to transmit in the next ISO event. Ensure no overflow
+		 * on 64-bit sdu_counter:
+		 *   (39 bits x 22 bits (4x10^6 us) = 61 bits / 8 bits (255 us) = 53 bits)
+		 */
+		sdu_counter = ceiling_fraction((cis->lll.event_count + 1U) * iso_interval,
+					       sdu_interval);
+
+		if (cis->hdr.test_mode.tx_sdu_counter == 0U) {
+			/* First ISO event. Align SDU counter for next event */
+			cis->hdr.test_mode.tx_sdu_counter = sdu_counter;
+			tx_sdu_count = 0U;
+		} else {
+			/* Calculate number of SDUs to produce for next ISO event */
+			tx_sdu_count = sdu_counter - cis->hdr.test_mode.tx_sdu_counter;
+		}
+
+		/* Now process all SDUs due for next ISO event */
+		for (uint8_t sdu = 0; sdu < tx_sdu_count; sdu++) {
+			ll_iso_transmit_test_send_sdu(cis->lll.handle, ticks_at_expire);
+		}
+	}
 }

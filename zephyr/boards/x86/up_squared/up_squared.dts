@@ -10,7 +10,7 @@
 
 #define DT_DRAM_SIZE		DT_SIZE_M(2048)
 
-#include <apollo_lake.dtsi>
+#include <intel/apollo_lake.dtsi>
 
 / {
 	model = "up_squared";
@@ -29,4 +29,8 @@
 		zephyr,uart-pipe = &uart1;
 		zephyr,bt-mon-uart = &uart1;
 	};
+};
+
+&hpet {
+	status = "disabled";
 };

@@ -3,13 +3,13 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <ztest.h>
-#include <drivers/entropy.h>
-#include <drivers/clock_control.h>
-#include <drivers/clock_control/nrf_clock_control.h>
+#include <zephyr/ztest.h>
+#include <zephyr/drivers/entropy.h>
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/drivers/clock_control/nrf_clock_control.h>
 #include <hal/nrf_clock.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(test);
 
 #define TEST_TIME_MS 10000
@@ -20,20 +20,19 @@ static bool test_end;
 
 #include <hal/nrf_gpio.h>
 
+static const struct device *const entropy = DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
 static struct onoff_manager *hf_mgr;
 static uint32_t iteration;
 
-static void setup(void)
+static void before(void *data)
 {
+	ARG_UNUSED(data);
+	zassert_true(device_is_ready(entropy));
+
 	hf_mgr = z_nrf_clock_control_get_onoff(CLOCK_CONTROL_NRF_SUBSYS_HF);
-	zassert_true(hf_mgr, NULL);
+	zassert_true(hf_mgr);
 
 	iteration = 0;
-}
-
-static void teardown(void)
-{
-	/* empty */
 }
 
 static void bt_timeout_handler(struct k_timer *timer)
@@ -97,12 +96,9 @@ static void check_hf_status(const struct device *dev, bool exp_on,
  * Test runs in the loop to eventually lead to cases when clock controlling is
  * preempted by timeout handler. At certain points clock status is validated.
  */
-static void test_onoff_interrupted(void)
+ZTEST(nrf_onoff_and_bt, test_onoff_interrupted)
 {
-	const struct device *clock_dev =
-		device_get_binding(DT_LABEL(DT_INST(0, nordic_nrf_clock)));
-	const struct device *entropy =
-		device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
+	const struct device *const clock_dev = DEVICE_DT_GET_ONE(nordic_nrf_clock);
 	struct onoff_client cli;
 	uint64_t start_time = k_uptime_get();
 	uint64_t elapsed;
@@ -111,18 +107,20 @@ static void test_onoff_interrupted(void)
 	uint8_t rand;
 	int backoff;
 
+	zassert_true(device_is_ready(clock_dev), "Device is not ready");
+
 	k_timer_start(&timer1, K_MSEC(1), K_NO_WAIT);
 
 	while (1) {
 		iteration++;
 
 		err = entropy_get_entropy(entropy, &rand, 1);
-		zassert_equal(err, 0, NULL);
+		zassert_equal(err, 0);
 		backoff = 3 * rand;
 
 		sys_notify_init_spinwait(&cli.notify);
 		err = onoff_request(hf_mgr, &cli);
-		zassert_true(err >= 0, NULL);
+		zassert_true(err >= 0);
 
 		k_busy_wait(backoff);
 
@@ -131,7 +129,7 @@ static void test_onoff_interrupted(void)
 		}
 
 		err = onoff_cancel_or_release(hf_mgr, &cli);
-		zassert_true(err >= 0, NULL);
+		zassert_true(err >= 0);
 
 		elapsed = k_uptime_get() - start_time;
 		if (elapsed > checkpoint) {
@@ -160,7 +158,7 @@ static void onoff_timeout_handler(struct k_timer *timer)
 	if (on) {
 		on = false;
 		err = onoff_cancel_or_release(hf_mgr, &cli);
-		zassert_true(err >= 0, NULL);
+		zassert_true(err >= 0);
 	} else {
 		on = true;
 		sys_notify_init_spinwait(&cli.notify);
@@ -192,12 +190,9 @@ K_TIMER_DEFINE(timer2, onoff_timeout_handler, NULL);
  * Test runs in the loop to eventually lead to cases when clock controlling is
  * preempted by timeout handler. At certain points clock status is validated.
  */
-static void test_bt_interrupted(void)
+ZTEST(nrf_onoff_and_bt, test_bt_interrupted)
 {
-	const struct device *clock_dev =
-		device_get_binding(DT_LABEL(DT_INST(0, nordic_nrf_clock)));
-	const struct device *entropy =
-		device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
+	const struct device *const clock_dev = DEVICE_DT_GET_ONE(nordic_nrf_clock);
 	uint64_t start_time = k_uptime_get();
 	uint64_t elapsed;
 	uint64_t checkpoint = 1000;
@@ -205,13 +200,15 @@ static void test_bt_interrupted(void)
 	uint8_t rand;
 	int backoff;
 
+	zassert_true(device_is_ready(clock_dev), "Device is not ready");
+
 	k_timer_start(&timer2, K_MSEC(1), K_NO_WAIT);
 
 	while (1) {
 		iteration++;
 
 		err = entropy_get_entropy(entropy, &rand, 1);
-		zassert_equal(err, 0, NULL);
+		zassert_equal(err, 0);
 		backoff = 3 * rand;
 
 		z_nrf_clock_bt_ctlr_hf_request();
@@ -239,14 +236,4 @@ static void test_bt_interrupted(void)
 	k_msleep(100);
 	check_hf_status(clock_dev, false, true);
 }
-
-void test_main(void)
-{
-	ztest_test_suite(test_nrf_onoff_and_bt,
-		ztest_unit_test_setup_teardown(test_onoff_interrupted,
-					       setup, teardown),
-		ztest_unit_test_setup_teardown(test_bt_interrupted,
-					       setup, teardown)
-			);
-	ztest_run_test_suite(test_nrf_onoff_and_bt);
-}
+ZTEST_SUITE(nrf_onoff_and_bt, NULL, NULL, before, NULL, NULL);

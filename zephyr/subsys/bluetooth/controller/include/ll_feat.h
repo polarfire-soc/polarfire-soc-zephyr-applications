@@ -37,6 +37,12 @@
 #define LL_FEAT_BIT_PING 0
 #endif /* !CONFIG_BT_CTLR_LE_PING */
 
+/* Maximum supported ACL Tx fragment size is limited by uint8_t len field in
+ * the PDU structure of the Controller implementation. 4 octets reserved for
+ * MIC in encrypted ACL PDUs, hence ACL Tx fragment maximum size of 251 octets.
+ */
+#define LL_LENGTH_OCTETS_TX_MAX MIN(CONFIG_BT_BUF_ACL_TX_SIZE, 251U)
+
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH_MAX)
 #define LL_FEAT_BIT_DLE BIT64(BT_LE_FEAT_BIT_DLE)
 #define LL_LENGTH_OCTETS_RX_MAX CONFIG_BT_CTLR_DATA_LENGTH_MAX
@@ -88,7 +94,11 @@
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 #define LL_FEAT_BIT_EXT_ADV BIT64(BT_LE_FEAT_BIT_EXT_ADV)
+#if defined(CONFIG_BT_OBSERVER)
 #define LL_EXT_OCTETS_RX_MAX CONFIG_BT_CTLR_ADV_EXT_RX_PDU_LEN_MAX
+#else /* !CONFIG_BT_OBSERVER */
+#define LL_EXT_OCTETS_RX_MAX 0
+#endif /* !CONFIG_BT_OBSERVER */
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
 #define LL_FEAT_BIT_EXT_ADV 0
 #define LL_EXT_OCTETS_RX_MAX 0
@@ -161,6 +171,12 @@
 #define LL_FEAT_BIT_RX_CTE 0
 #endif /* !CONFIG_BT_CTLR_DF && !CONFIG_BT_CTLR_DF_CTE_RX */
 
+#if defined(CONFIG_BT_CTLR_SCA_UPDATE)
+#define LL_FEAT_BIT_SCA_UPDATE BIT64(BT_LE_FEAT_BIT_SCA_UPDATE)
+#else /* !CONFIG_BT_CTLR_SCA_UPDATE */
+#define LL_FEAT_BIT_SCA_UPDATE 0
+#endif /* !CONFIG_BT_CTLR_SCA_UPDATE */
+
 #if defined(CONFIG_BT_CTLR_CENTRAL_ISO)
 #define LL_FEAT_BIT_CIS_CENTRAL BIT64(BT_LE_FEAT_BIT_CIS_CENTRAL)
 #else /* !CONFIG_BT_CTLR_CENTRAL_ISO */
@@ -175,7 +191,12 @@
 
 #if defined(CONFIG_BT_CTLR_ADV_ISO)
 #define LL_FEAT_BIT_ISO_BROADCASTER BIT64(BT_LE_FEAT_BIT_ISO_BROADCASTER)
+#if defined(CONFIG_BT_ISO_TX_MTU)
+#define LL_BIS_OCTETS_TX_MAX MIN(CONFIG_BT_CTLR_ADV_ISO_PDU_LEN_MAX, \
+				 CONFIG_BT_ISO_TX_MTU)
+#else /* !CONFIG_BT_ISO_TX_MTU */
 #define LL_BIS_OCTETS_TX_MAX CONFIG_BT_CTLR_ADV_ISO_PDU_LEN_MAX
+#endif /* !CONFIG_BT_ISO_TX_MTU */
 #else /* !CONFIG_BT_CTLR_ADV_ISO */
 #define LL_FEAT_BIT_ISO_BROADCASTER 0
 #define LL_BIS_OCTETS_TX_MAX 0
@@ -189,17 +210,31 @@
 #define LL_BIS_OCTETS_RX_MAX 0
 #endif /* !CONFIG_BT_CTLR_SYNC_ISO */
 
-/* All defined feature bits */
-#define LL_FEAT_BIT_MASK         0xFFFFFFFFFULL
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) || \
+	defined(CONFIG_BT_CTLR_SYNC_PERIODIC_ADI_SUPPORT)
+#define LL_FEAT_BIT_PERIODIC_ADI_SUPPORT BIT64(BT_LE_FEAT_BIT_PER_ADV_ADI_SUPP)
+#else  /* !CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT &&
+	* !CONFIG_BT_CTLR_SYNC_PERIODIC_ADI_SUPPORT
+	*/
+#define LL_FEAT_BIT_PERIODIC_ADI_SUPPORT 0U
+#endif /* !CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT &&
+	* !CONFIG_BT_CTLR_SYNC_PERIODIC_ADI_SUPPORT
+	*/
 
-/* Feature bits that are valid from controller to controller */
-#define LL_FEAT_BIT_MASK_VALID   0xFF787CF2FULL
+/* All defined feature bits */
+#define LL_FEAT_BIT_MASK         0xFFFFFFFFFFULL
+
+/*
+ * LL_FEAT_BIT_MASK_VALID is defined as per
+ * Core Spec V5.3 Volume 6, Part B, chapter 4.6
+ */
+#define LL_FEAT_BIT_MASK_VALID   0xEFF787CF2FULL
 
 /* Mask to filter away octet 0 for feature exchange */
 #define LL_FEAT_FILTER_OCTET0    (LL_FEAT_BIT_MASK & ~0xFFULL)
 
 /* Mask for host controlled features */
-#define LL_FEAT_HOST_BIT_MASK    0x100000000ULL
+#define LL_FEAT_HOST_BIT_MASK    0x4100000000ULL
 
 /* Feature bits of this controller */
 #define LL_FEAT                  (LL_FEAT_BIT_ENC | \
@@ -223,9 +258,11 @@
 				  LL_FEAT_BIT_ANT_SWITCH_TX_AOD | \
 				  LL_FEAT_BIT_ANT_SWITCH_RX_AOA | \
 				  LL_FEAT_BIT_RX_CTE | \
+				  LL_FEAT_BIT_SCA_UPDATE | \
 				  LL_FEAT_BIT_CHAN_SEL_2 | \
 				  LL_FEAT_BIT_MIN_USED_CHAN | \
 				  LL_FEAT_BIT_CIS_CENTRAL | \
 				  LL_FEAT_BIT_CIS_PERIPHERAL | \
 				  LL_FEAT_BIT_ISO_BROADCASTER | \
-				  LL_FEAT_BIT_SYNC_RECEIVER)
+				  LL_FEAT_BIT_SYNC_RECEIVER | \
+				  LL_FEAT_BIT_PERIODIC_ADI_SUPPORT)

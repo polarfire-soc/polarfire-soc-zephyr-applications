@@ -8,16 +8,16 @@
 #include <stddef.h>
 #include <errno.h>
 #include <string.h>
-#include <drivers/flash.h>
-#include <storage/flash_map.h>
-#include <zephyr.h>
-#include <init.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/storage/flash_map.h>
+#include <zephyr/kernel.h>
+#include <zephyr/init.h>
 
-#include <sys/__assert.h>
-#include <sys/byteorder.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/sys/byteorder.h>
 
 #include "bootutil/bootutil_public.h"
-#include <dfu/mcuboot.h>
+#include <zephyr/dfu/mcuboot.h>
 
 #include "mcuboot_priv.h"
 
@@ -185,21 +185,30 @@ int boot_request_upgrade_multi(int image_index, int permanent)
 
 bool boot_is_img_confirmed(void)
 {
+	struct boot_swap_state state;
 	const struct flash_area *fa;
 	int rc;
-	uint8_t flag_val;
 
 	rc = flash_area_open(FLASH_AREA_IMAGE_PRIMARY, &fa);
 	if (rc) {
 		return false;
 	}
 
-	rc = boot_read_image_ok(fa, &flag_val);
-	if (rc) {
+	rc = boot_read_swap_state(fa, &state);
+	if (rc != 0) {
 		return false;
 	}
 
-	return flag_val == BOOT_FLAG_SET;
+	if (state.magic == BOOT_MAGIC_UNSET) {
+		/* This is initial/preprogramed image.
+		 * Such image can neither be reverted nor physically confirmed.
+		 * Treat this image as confirmed which ensures consistency
+		 * with `boot_write_img_confirmed...()` procedures.
+		 */
+		return true;
+	}
+
+	return state.image_ok == BOOT_FLAG_SET;
 }
 
 int boot_write_img_confirmed(void)

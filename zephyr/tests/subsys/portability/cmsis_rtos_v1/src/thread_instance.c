@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <kernel.h>
+#include <zephyr/ztest.h>
+#include <zephyr/kernel.h>
 #include <cmsis_os.h>
 
 #ifdef CONFIG_COVERAGE
-#define STACKSZ		(512 + CONFIG_TEST_EXTRA_STACKSIZE)
+#define STACKSZ		(512 + CONFIG_TEST_EXTRA_STACK_SIZE)
 #else
 #define STACKSZ		(512U)
 #endif
@@ -23,7 +23,7 @@ void thread_inst_check(void const *argument)
 
 osThreadDef(thread_inst_check, osPriorityNormal, 3, STACKSZ);
 
-void test_thread_instances(void)
+ZTEST(thread_instance, test_thread_instances)
 {
 	osThreadId id1, id2, id3, id4;
 	osStatus status;
@@ -50,3 +50,4 @@ void test_thread_instances(void)
 	zassert_true(id4 != NULL, "Failed creating thread_inst_check");
 	zassert_true(id2 == id4, "Error creating thread_inst_check");
 }
+ZTEST_SUITE(thread_instance, NULL, NULL, NULL, NULL, NULL);

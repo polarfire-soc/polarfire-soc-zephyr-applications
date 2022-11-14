@@ -54,12 +54,16 @@ source "drivers/clock_control/Kconfig.rv32m1"
 
 source "drivers/clock_control/Kconfig.esp32"
 
-source "drivers/clock_control/Kconfig.esp32s2"
-
 source "drivers/clock_control/Kconfig.litex"
 
 source "drivers/clock_control/Kconfig.rcar"
 
 source "drivers/clock_control/Kconfig.xec"
+
+source "drivers/clock_control/Kconfig.cavs"
+
+source "drivers/clock_control/Kconfig.aspeed"
+
+source "drivers/clock_control/Kconfig.gd32"
 
 endif # CLOCK_CONTROL

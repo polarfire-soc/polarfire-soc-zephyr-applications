@@ -6,12 +6,14 @@
 
 #define DT_DRV_COMPAT atmel_sam_usbhs
 
-#include <usb/usb_device.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/irq.h>
+#include <zephyr/kernel.h>
 #include <soc.h>
 #include <string.h>
 
 #define LOG_LEVEL CONFIG_USB_DRIVER_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(usb_dc_sam_usbhs);
 
 /*
@@ -46,11 +48,8 @@ LOG_MODULE_REGISTER(usb_dc_sam_usbhs);
 #endif
 
 #define NUM_OF_EP_MAX		DT_INST_PROP(0, num_bidir_endpoints)
-#if DT_INST_NODE_HAS_PROP(0, maximum_speed)
-#define USB_MAXIMUM_SPEED	DT_ENUM_IDX(DT_DRV_INST(0), maximum_speed)
-#else
-#define USB_MAXIMUM_SPEED	2 /* Default to high-speed */
-#endif
+#define USB_MAXIMUM_SPEED	DT_INST_ENUM_IDX_OR(0, maximum_speed, 1)
+BUILD_ASSERT(USB_MAXIMUM_SPEED, "low-speed is not supported");
 
 struct usb_device_ep_data {
 	uint16_t mps;
@@ -247,6 +246,16 @@ static void usb_dc_isr(void)
 		/* Acknowledge the interrupt */
 		USBHS->USBHS_DEVICR = USBHS_DEVICR_EORSTC;
 
+		if (!usb_dc_ep_is_configured(0) && dev_data.ep_data[0].mps) {
+			/* Restore EP0 configuration to previously set mps */
+			struct usb_dc_ep_cfg_data cfg = {
+				.ep_addr = 0,
+				.ep_mps = dev_data.ep_data[0].mps,
+				.ep_type = USB_DC_EP_CONTROL,
+			};
+			usb_dc_ep_configure(&cfg);
+			usb_dc_ep_enable(0);
+		}
 		if (usb_dc_ep_is_enabled(0)) {
 			/* The device clears some of the configuration of EP0
 			 * when it receives the EORST.  Re-enable interrupts.
@@ -312,18 +321,12 @@ int usb_dc_attach(void)
 
 	/* Select the speed */
 	regval = USBHS_DEVCTRL_DETACH;
-#if USB_MAXIMUM_SPEED == 0
-	/* low-speed */
-	regval |= USBHS_DEVCTRL_LS;
-	regval |= USBHS_DEVCTRL_SPDCONF_LOW_POWER;
-#elif USB_MAXIMUM_SPEED == 1
-	/* full-speed */
-	regval |= USBHS_DEVCTRL_SPDCONF_LOW_POWER;
-#elif USB_MAXIMUM_SPEED == 2
+#if (USB_MAXIMUM_SPEED == 2) && IS_ENABLED(CONFIG_USB_DC_HAS_HS_SUPPORT)
 	/* high-speed */
 	regval |= USBHS_DEVCTRL_SPDCONF_NORMAL;
 #else
-#error "Unsupported maximum speed defined in device tree."
+	/* full-speed */
+	regval |= USBHS_DEVCTRL_SPDCONF_LOW_POWER;
 #endif
 	USBHS->USBHS_DEVCTRL = regval;
 
@@ -357,7 +360,7 @@ int usb_dc_attach(void)
 int usb_dc_detach(void)
 {
 	/* Detach the device */
-	USBHS->USBHS_DEVCTRL &= ~USBHS_DEVCTRL_DETACH;
+	USBHS->USBHS_DEVCTRL |= USBHS_DEVCTRL_DETACH;
 
 	/* Disable the USB clock */
 	usb_dc_disable_clock();
@@ -474,6 +477,8 @@ int usb_dc_ep_configure(const struct usb_dc_ep_cfg_data *const cfg)
 
 	/* Reset the endpoint */
 	usb_dc_ep_reset(ep_idx);
+	/* Initialize the endpoint FIFO */
+	usb_dc_ep_fifo_reset(ep_idx);
 
 	/* Map the endpoint type */
 	switch (cfg->ep_type) {
@@ -551,7 +556,7 @@ int usb_dc_ep_configure(const struct usb_dc_ep_cfg_data *const cfg)
 
 	/* Check that the endpoint is correctly configured */
 	if (!usb_dc_ep_is_configured(ep_idx)) {
-		LOG_ERR("endpoint configurationf failed");
+		LOG_ERR("endpoint configuration failed");
 		return -EINVAL;
 	}
 

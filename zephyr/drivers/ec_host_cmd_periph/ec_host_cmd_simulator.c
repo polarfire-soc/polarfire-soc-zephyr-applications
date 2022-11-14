@@ -6,8 +6,11 @@
 
 #define DT_DRV_COMPAT zephyr_sim_ec_host_cmd_periph
 
-#include <device.h>
-#include <drivers/ec_host_cmd_periph.h>
+#include <errno.h>
+
+#include <zephyr/device.h>
+#include <zephyr/drivers/ec_host_cmd_periph.h>
+#include <zephyr/kernel.h>
 #include <string.h>
 
 #ifndef CONFIG_ARCH_POSIX

@@ -9,12 +9,13 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#include <toolchain.h>
+#include <zephyr/toolchain.h>
 
 #include <soc.h>
-#include <device.h>
+#include <zephyr/device.h>
 
-#include <drivers/entropy.h>
+#include <zephyr/drivers/entropy.h>
+#include <zephyr/irq.h>
 
 #include "hal/swi.h"
 #include "hal/ccm.h"
@@ -52,7 +53,7 @@ static struct {
 } event;
 
 /* Entropy device */
-static const struct device *dev_entropy;
+static const struct device *const dev_entropy = DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
 
 static int init_reset(void);
 #if defined(CONFIG_BT_CTLR_LOW_LAT_ULL_DONE)
@@ -123,9 +124,8 @@ int lll_init(void)
 {
 	int err;
 
-	/* Get reference to entropy device */
-	dev_entropy = device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
-	if (!dev_entropy) {
+	/* Check if entropy device is ready */
+	if (!device_is_ready(dev_entropy)) {
 		return -ENODEV;
 	}
 
@@ -156,13 +156,27 @@ int lll_init(void)
 	irq_enable(LL_RADIO_IRQn);
 	irq_enable(LL_RTC0_IRQn);
 	irq_enable(HAL_SWI_RADIO_IRQ);
-#if defined(CONFIG_BT_CTLR_LOW_LAT) || \
-	(CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)
-	irq_enable(HAL_SWI_JOB_IRQ);
-#endif
+	if (IS_ENABLED(CONFIG_BT_CTLR_LOW_LAT) ||
+	    (CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)) {
+		irq_enable(HAL_SWI_JOB_IRQ);
+	}
 
 	/* Call it after IRQ enable to be able to measure ISR latency */
 	radio_setup();
+
+	return 0;
+}
+
+int lll_deinit(void)
+{
+	/* Disable IRQs */
+	irq_disable(LL_RADIO_IRQn);
+	irq_disable(LL_RTC0_IRQn);
+	irq_disable(HAL_SWI_RADIO_IRQ);
+	if (IS_ENABLED(CONFIG_BT_CTLR_LOW_LAT) ||
+	    (CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)) {
+		irq_disable(HAL_SWI_JOB_IRQ);
+	}
 
 	return 0;
 }
@@ -312,9 +326,10 @@ int lll_done(void *param)
 }
 
 #if defined(CONFIG_BT_CTLR_LOW_LAT_ULL_DONE)
-void lll_done_sync(void)
+void lll_done_ull_inc(void)
 {
-	event.done.ull_count = event.done.lll_count;
+	LL_ASSERT(event.done.ull_count != event.done.lll_count);
+	event.done.ull_count++;
 }
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 
@@ -456,6 +471,16 @@ uint32_t lll_radio_rx_ready_delay_get(uint8_t phy, uint8_t flags)
 	return radio_rx_ready_delay_get(phy, flags);
 }
 
+void lll_isr_status_reset(void)
+{
+	radio_status_reset();
+	radio_tmr_status_reset();
+	radio_filter_status_reset();
+	if (IS_ENABLED(CONFIG_BT_CTLR_PRIVACY)) {
+		radio_ar_status_reset();
+	}
+	radio_rssi_status_reset();
+}
 
 static int init_reset(void)
 {
@@ -466,6 +491,7 @@ static int init_reset(void)
 static inline void done_inc(void)
 {
 	event.done.lll_count++;
+	LL_ASSERT(event.done.lll_count != event.done.ull_count);
 }
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 

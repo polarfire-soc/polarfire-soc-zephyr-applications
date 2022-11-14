@@ -10,8 +10,7 @@ The SAM E70 Xplained evaluation kit is a development platform to evaluate the
 Atmel SAM E70 series microcontrollers. The current version allows to use both
 IC variations ATSAME70Q21A(B).
 
-.. image:: img/sam_e70_xplained.png
-     :width: 500px
+.. image:: img/sam_e70_xplained.jpg
      :align: center
      :alt: SAM E70 Xplained
 
@@ -64,6 +63,10 @@ features:
 | USB       | on-chip    | USB device                          |
 +-----------+------------+-------------------------------------+
 | PWM       | on-chip    | pwm                                 |
++-----------+------------+-------------------------------------+
+| CAN       | on-chip    | canbus                              |
++-----------+------------+-------------------------------------+
+| HWINFO    | on-chip    | Unique device serial number         |
 +-----------+------------+-------------------------------------+
 
 Other hardware features are not currently supported by Zephyr.
@@ -138,7 +141,7 @@ Flashing
       :board: sam_e70_xplained
       :goals: build flash
 
-   You should see "Hello World! arm" in your terminal.
+   You should see "Hello World! sam_e70_xplained" in your terminal.
 
 #. To use the SoC variation B IC, you need type "sam_e70b_xplained".
 
@@ -146,6 +149,8 @@ Flashing
       :zephyr-app: samples/hello_world
       :board: sam_e70b_xplained
       :goals: build flash
+
+   You should see "Hello World! sam_e70b_xplained" in your terminal.
 
 You can flash the image using an external debug adapter such as J-Link
 or ULINK, connected to the 20-pin JTAG header. Supply the name of the

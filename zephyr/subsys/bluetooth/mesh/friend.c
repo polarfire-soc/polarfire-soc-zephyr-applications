@@ -5,12 +5,12 @@
  */
 
 #include <stdint.h>
-#include <zephyr.h>
-#include <sys/byteorder.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/byteorder.h>
 
-#include <net/buf.h>
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/mesh.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/mesh.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_FRIEND)
 #define LOG_MODULE_NAME bt_mesh_friend
@@ -50,7 +50,7 @@ struct friend_pdu_info {
 };
 
 NET_BUF_POOL_FIXED_DEFINE(friend_buf_pool, FRIEND_BUF_COUNT,
-			  BT_MESH_ADV_DATA_SIZE, NULL);
+			  BT_MESH_ADV_DATA_SIZE, 8, NULL);
 
 static struct friend_adv {
 	uint16_t app_idx;
@@ -281,16 +281,23 @@ int bt_mesh_friend_clear(struct bt_mesh_net_rx *rx, struct net_buf_simple *buf)
 
 static void friend_sub_add(struct bt_mesh_friend *frnd, uint16_t addr)
 {
-	int i;
+	int empty_idx = INT_MAX;
 
-	for (i = 0; i < ARRAY_SIZE(frnd->sub_list); i++) {
-		if (frnd->sub_list[i] == BT_MESH_ADDR_UNASSIGNED) {
-			frnd->sub_list[i] = addr;
+	for (int i = 0; i < ARRAY_SIZE(frnd->sub_list); i++) {
+		if (frnd->sub_list[i] == addr) {
 			return;
+		}
+
+		if (frnd->sub_list[i] == BT_MESH_ADDR_UNASSIGNED) {
+			empty_idx = i;
 		}
 	}
 
-	BT_WARN("No space in friend subscription list");
+	if (empty_idx != INT_MAX) {
+		frnd->sub_list[empty_idx] = addr;
+	} else {
+		BT_WARN("No space in friend subscription list");
+	}
 }
 
 static void friend_sub_rem(struct bt_mesh_friend *frnd, uint16_t addr)
@@ -1140,6 +1147,11 @@ static void buf_send_start(uint16_t duration, int err, void *user_data)
 
 	BT_DBG("err %d", err);
 
+	if (!frnd->pending_buf) {
+		BT_WARN("Attempt of sending to removed friend");
+		return;
+	}
+
 	frnd->pending_buf = 0U;
 
 	/* Friend Offer doesn't follow the re-sending semantics */
@@ -1155,7 +1167,7 @@ static void buf_send_end(int err, void *user_data)
 
 	BT_DBG("err %d", err);
 
-	if (frnd->pending_req) {
+	if (frnd->pending_req || frnd->pending_buf) {
 		BT_WARN("Another request before previous completed sending");
 		return;
 	}
@@ -1261,7 +1273,8 @@ static void friend_timeout(struct k_work *work)
 	frnd->queue_size--;
 
 send_last:
-	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA, FRIEND_XMIT, K_NO_WAIT);
+	buf = bt_mesh_adv_create(BT_MESH_ADV_DATA, BT_MESH_LOCAL_ADV,
+				 FRIEND_XMIT, K_NO_WAIT);
 	if (!buf) {
 		BT_ERR("Unable to allocate friend adv buffer");
 		return;
