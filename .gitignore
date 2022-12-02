@@ -3,3 +3,4 @@ bootloader/
 build*/
 modules/
 tools/
+.vscode/
