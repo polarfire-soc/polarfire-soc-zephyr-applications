@@ -46,8 +46,11 @@ The table below lists the current applications available for PolarFire Soc Icicl
 
 | `application` |
 | --- |
+| `mpfs-applications/blinky` |
+| `mpfs-applications/smp-ddr-four-cpu` |
+| `mpfs-applications/smp-ddr-two-cpu` |
+| `mpfs-applications/smp-lim-two-cpu` |
 | `mpfs-applications/synchronization` |
-| `mpfs-applications/smp/pi` | 
 
 
 ### Build Zephyr OS Applications using Docker:

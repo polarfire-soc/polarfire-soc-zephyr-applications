@@ -29,7 +29,7 @@ $ west build -p -b mpfs_icicle mpfs-applications/synchronization -G "Eclipse CDT
 
 ### Symmetric Multi Processing Support 
 
-This sample application calculates Pi independently in many threads, and
+This sample applications for SMP calculate Pi independently in many threads, and
 demonstrates the benefit of multiple execution units (CPU cores)
 when compute-intensive tasks can be run in parallel, with
 no cross-dependencies or shared resources.
@@ -42,10 +42,15 @@ You can also edit the sample source code to change the
 number of digits calculated (``DIGITS_NUM``), and the
 number of threads to use (``THREADS_NUM``).
 
+The applications are provided with Devicetree overlays demonstrating the
+application running from:
+- DDR with four harts
+- DDR with two harts
+- LIM with two harts
 
-To build this application and generate an eclipse project configuration file which can be used in Microchip SoftConsole:
+To build a SMP application, for example targeting DDR with four harts and generate an eclipse project configuration file which can be used in Microchip SoftConsole:
 ```
-$ west build -p -b mpfs_icicle mpfs-applications/smp/pi - G "Eclipse CDT4 - Unix Makefiles"
+$ west build -p -b mpfs_icicle mpfs-applications/smp-ddr-four-cpu/pi - G "Eclipse CDT4 - Unix Makefiles"
 ```
 
 ### Zephyr OS Application Build Directory
