@@ -48,13 +48,6 @@ To build this application and generate an eclipse project configuration file whi
 $ west build -p -b mpfs_icicle mpfs-applications/smp/pi - G "Eclipse CDT4 - Unix Makefiles"
 ```
 
-### GPIO Example
-This sample application extends the synchronization application by toggling the leds on the PolarFire-SoC Icicle Kit. It makes use of the mss_gpio driver that gets included along with the mpfs_hal when imported as a module.
-To build this application and generate an eclipse project configuration file which can be used in Microchip SoftConsole:
-```
-$ west build -p -b mpfs_icicle mpfs-applications/synchronization_blinky -G "Eclipse CDT4 - Unix Makefiles"
-```
-
 ### Zephyr OS Application Build Directory
 The output of the build process can be found in:
 ```

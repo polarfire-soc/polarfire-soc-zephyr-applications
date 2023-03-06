@@ -45,9 +45,8 @@ Where `mpfs_icicle` is the supported board for the PolarFire SoC Icicle Kit, `<a
 The table below lists the current applications available for PolarFire Soc Icicle Kit:
 
 | `application` |
-| --- | 
+| --- |
 | `mpfs-applications/synchronization` |
-| `mpfs-applications/synchronization_blinky` |  
 | `mpfs-applications/smp/pi` | 
 
 
