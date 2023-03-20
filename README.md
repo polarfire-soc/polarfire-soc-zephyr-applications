@@ -2,14 +2,9 @@
 This repository provides Microchip PolarFire SoC support for the Zephyr RTOS project with:
 - Sample Zephyr OS applications for the Microchip PolarFire SoC Icicle Kit.
 
-- A Dockerfile to build a docker image capable of building a Zephyr OS application.
-
 - SoftConsole Debug launch configurations for debugging a Zephyr OS application on a Microchip Polarfire SoC Icicle Kit.
 
-
-
 # Building Zephyr OS Applications
-
 
 This section describes the procedure to build a Zephyr OS application for Microchip PolarFire SoC.
 
@@ -54,18 +49,12 @@ The table below lists the current applications available for PolarFire Soc Icicl
 | `mpfs-applications/synchronization` |
 
 
-### Build Zephyr OS Applications using Docker:
-As an alternative to installing the Zephyr SDK and build system on the Host PC, a Dockerfile is provided that will build a Docker image that has all dependencies met to build Zephyr OS applications. To build a Zephyr OS Application using Docker, [follow the instructions here](container-services/README.md)
-
 ## Debug Zephyr OS Application using Microchip SoftConsole IDE:
 [Follow the instructions here](softconsole-launch-configs/README.md) to start a debug session using Microchips SoftConsole IDE
-
 
 ## Additional Reading:
 [Zephyr User Manual](https://docs.zephyrproject.org/latest/)
 
-[Zephyr Project - Github](https://github.com/zephyrproject-rtos/zephyr) 
+[Zephyr Project - Github](https://github.com/zephyrproject-rtos/zephyr)
 
-[Polarfire SoC Documentation](https://github.com/polarfire-soc/polarfire-soc-documentation)    
-
-
+[Polarfire SoC Documentation](https://github.com/polarfire-soc/polarfire-soc-documentation)
