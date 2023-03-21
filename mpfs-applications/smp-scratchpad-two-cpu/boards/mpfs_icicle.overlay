@@ -1,0 +1,24 @@
+/ {
+	sram2: memory@a080000 {
+		compatible = "mmio-sram";
+		reg = <0xA080000 0x80000>;
+	};
+
+	cpus {
+		cpu@0 {
+			status = "disabled";
+		};
+	};
+
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &uart1;
+		zephyr,sram = &sram2;
+	};
+};
+
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	clock-frequency = <150000000>;
+};
