@@ -11,8 +11,8 @@ A SoftConsole debug configuration is required to load a zephyr application onto 
 In the SoftConosle workspace, in the top left corner click *File >> import.. >> Run/Debug >> Launch Configurations* and click next. Navigate to your polarfire-soc-zephyr-applications/softconsole-launch-configs directory and click open. Choose the launch config for the Zephyr application that you have built.
 
 
-The mpfs-applications output to uart 0 of the Polarfire SoC Icicle Kit. Connect your Polarfire SoC Icicle Kit to your PC using microUSB-USB cable to access serial console. Using the `screen`, command in another console, enter:
+The mpfs-applications output to UART 1 of the Polarfire SoC Icicle Kit. Connect your Polarfire SoC Icicle Kit to your PC using microUSB-USB cable to access serial console. Using the `screen`, command in another console, enter:
 ```
-$ sudo screen -L /dev/serial/by-id/usb-Silicon_Labs_CP2108_Quad_USB_to_UART_Bridge_Controller_*-if00-port0 115200
+$ sudo screen -L /dev/serial/by-id/usb-Silicon_Labs_CP2108_Quad_USB_to_UART_Bridge_Controller_*-if00-port1 115200
 ``` 
 Power on the Icicle Kit and press `Debug` in SoftConsole to launch the debug seesion. The debugger will stop at the break point '__start', press continue in SoftConsole, which will load the Zephyr application on to the Icicle kit.
