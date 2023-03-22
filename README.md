@@ -22,9 +22,8 @@ $ git clone https://github.com/polarfire-soc/polarfire-soc-zephyr-applications.g
 ```
 The next step initializes the polarfire-soc-zephyr-applications directory to be used with zephyr's build system, west.
 ```
-$ cd polarfire-soc-applications/zephyr
-$ west init -l
-$ cd ../
+$ cd polarfire-soc-zephyr-applications
+$ west init .
 $ west update
 $ west zephyr-export
 $ source zephyr/zephyr-env.sh
